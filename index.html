@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ロシア語日課学習アプリ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 p-3 sm:p-6">
+  <div id="app" class="max-w-xl mx-auto"></div>
+
+  <script>
+    // --- パスワード設定（必要に応じて変更してください） ---
+    const SECRET_PASSWORD = "5028"; // 初期パスワード
+
+    // --- データセット ---
+    const SENTENCES_POOL = [
+      { ru: "Я читаю книгу.", jp: "私は本を読んでいます。" },
+      { ru: "Он пишет習 письма.", jp: "彼は手紙を書いています。" },
+      { ru: "Она изучает русский язык.", jp: "彼女はロシア語を勉強しています。" },
+      { ru: "Мы живем в Токио.", jp: "私たちは東京に住んでいます。" },
+      { ru: "Вы понимаете по-русски?", jp: "あなたはロシア語が分かりますか？" },
+      { ru: "Они смотрят новый фильм.", jp: "彼らは新しい映画を見ています。" },
+      { ru: "Я люблю слушать музыку.", jp: "私は音楽を聴くのが好きです。" },
+      { ru: "Брат работает в банке.", jp: "兄は銀行で働いています。" },
+      { ru: "Сестра пьет горячий чай.", jp: "姉は温かいお茶を飲んでいます。" },
+      { ru: "Мой друг хорошо говорит.", jp: "私の友達は上手に話します。" }
+    ];
+
+    const WORDS_POOL = [
+      { ru: "книга", reading: "クニーガ", jp: "本" },
+      { ru: "письмо", reading: "ピシモー", jp: "手紙" },
+      { ru: "город", reading: "ゴーロト", jp: "街・都市" },
+      { ru: "друг", reading: "ドルーグ", jp: "友達" },
+      { ru: "время", reading: "ヴレーミャ", jp: "時間" },
+      { ru: "работа", reading: "ラボータイ", jp: "仕事" },
+      { ru: "слово", reading: "スローヴォ", jp: "言葉・単語" },
+      { ru: "семья", reading: "セミヤー", jp: "家族" },
+      { ru: "утро", reading: "ウートロ", jp: "朝" },
+      { ru: "вечер", reading: "ヴェーチェル", jp: "夜・晩" }
+    ];
+
+    // --- アプリの状態（State） ---
+    let state = {
+      isAuthenticated: localStorage.getItem('ru_app_auth') === 'true',
+      passwordInput: '',
+      authError: false,
+      
+      selectedDate: new Date().toISOString().split('T')[0],
+      mainTab: 'grammar', // 'grammar' | 'vocab'
+      
+      // 文法状態
+      grammarSubTab: 'morning', // 'morning' | 'night'
+      grammarCardIdx: 0,
+      grammarMorningRevealed: false,
+      grammarNightTypedText: '',
+      grammarNightQ5TypedText: '',
+      grammarNightQ5Checked: false,
+      
+      // 単語状態
+      vocabSubTab: 'day1_m', // 'day1_m' | 'day1_n' | 'day2_m' | 'day2_n'
+      vocabNightTyped: {}, // { idx: text }
+      vocabNightChecked: {} // { idx: boolean }
+    };
+
+    // 日付から固定の問題5個を取得する簡易ハッシュ関数
+    function getDailyData(dateStr) {
+      let seed = 0;
+      for (let i = 0; i < dateStr.length; i++) {
+        seed += dateStr.charCodeAt(i);
+      }
+      
+      const sentences = [];
+      const words = [];
+      for (let i = 0; i < 5; i++) {
+        sentences.push(SENTENCES_POOL[(seed + i * 3) % SENTENCES_POOL.length]);
+        words.push(WORDS_POOL[(seed + i * 2) % WORDS_POOL.length]);
+      }
+      return { sentences, words };
+    }
+
+    // --- メインレンダリング機能 ---
+    function render() {
+      const app = document.getElementById('app');
+
+      // 1. 未認証の場合（パスワード画面）
+      if (!state.isAuthenticated) {
+        app.innerHTML = `
+          <div class="bg-white rounded-2xl shadow-xl p-8 mt-12 text-center border border-slate-100">
+            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i data-lucide="lock" class="w-8 h-8"></i>
+            </div>
+            <h2 class="text-2xl font-bold mb-2">自分専用 ロシア語学習</h2>
+            <p class="text-sm text-slate-500 mb-6">パスワードを入力してログインしてください</p>
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+              <input type="password" id="passInput" value="${state.passwordInput}" oninput="state.passwordInput = this.value" placeholder="パスワード" class="w-full text-center px-4 py-3 rounded-xl border ${state.authError ? 'border-red-500' : 'border-slate-300'} focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              ${state.authError ? '<p class="text-xs text-red-500">パスワードが違います</p>' : ''}
+              <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-indigo-700 transition">ログイン</button>
+            </form>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      // 2. 認証済みの場合（メインアプリ画面）
+      const { sentences, words } = getDailyData(state.selectedDate);
+
+      app.innerHTML = `
+        <!-- ヘッダー / 日付選択 / ログアウト -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mb-4 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <button onclick="changeDate(-1)" class="p-2 hover:bg-slate-100 rounded-lg text-slate-600"><i data-lucide="chevron-left"></i></button>
+            <input type="date" value="${state.selectedDate}" onchange="setDate(this.value)" class="font-bold text-slate-700 bg-transparent focus:outline-none">
+            <button onclick="changeDate(1)" class="p-2 hover:bg-slate-100 rounded-lg text-slate-600"><i data-lucide="chevron-right"></i></button>
+          </div>
+          <button onclick="handleLogout()" class="text-xs text-slate-400 hover:text-red-500 flex items-center space-x-1">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+            <span>ロック</span>
+          </button>
+        </div>
+
+        <!-- メインタブ（文法 / 単語） -->
+        <div class="grid grid-cols-2 gap-2 p-1 bg-slate-200/60 rounded-xl mb-4">
+          <button onclick="switchMainTab('grammar')" class="py-2.5 rounded-lg text-sm font-bold transition ${state.mainTab === 'grammar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
+            文法（短文5個）
+          </button>
+          <button onclick="switchMainTab('vocab')" class="py-2.5 rounded-lg text-sm font-bold transition ${state.mainTab === 'vocab' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
+            単語（5個）
+          </button>
+        </div>
+
+        <!-- コンテンツエリア -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+          ${state.mainTab === 'grammar' ? renderGrammarSection(sentences) : renderVocabSection(words)}
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    // --- 文法セクション ---
+    function renderGrammarSection(sentences) {
+      const cur = sentences[state.grammarCardIdx];
+      return `
+        <!-- サブタブ -->
+        <div class="flex border-b border-slate-100 mb-5 pb-2 space-x-4">
+          <button onclick="state.grammarSubTab = 'morning'; render();" class="text-sm font-bold pb-1 ${state.grammarSubTab === 'morning' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-slate-400'}">朝：学習（1問ずつ確認）</button>
+          <button onclick="state.grammarSubTab = 'night'; render();" class="text-sm font-bold pb-1 ${state.grammarSubTab === 'night' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-slate-400'}">夜：テスト（復習4問+打つ1問）</button>
+        </div>
+
+        ${state.grammarSubTab === 'morning' ? `
+          <!-- 朝モード -->
+          <div class="text-center py-4">
+            <span class="inline-block px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-bold mb-4">問題 ${state.grammarCardIdx + 1} / 5</span>
+            <div class="text-2xl font-bold text-slate-800 mb-6">${cur.ru}</div>${state.grammarMorningRevealed ? `
+              <div class="bg-indigo-50/50 p-4 rounded-xl text-indigo-900 font-medium mb-6 animate-fade-in">${cur.jp}</div>
+            ` : `
+              <button onclick="state.grammarMorningRevealed = true; render();" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 py-3 rounded-xl font-bold text-sm mb-6 transition">答えを確認する</button>
+            `}
+
+            <div class="flex justify-between space-x-2">
+              <button onclick="state.grammarCardIdx = Math.max(0, state.grammarCardIdx - 1); state.grammarMorningRevealed = false; render();" ${state.grammarCardIdx === 0 ? 'disabled class="opacity-30 cursor-not-allowed px-4 py-2 bg-slate-100 rounded-lg"' : 'class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-bold text-slate-600"'}>前へ</button>
+              <button onclick="state.grammarCardIdx = Math.min(4, state.grammarCardIdx + 1); state.grammarMorningRevealed = false; render();" ${state.grammarCardIdx === 4 ? 'disabled class="opacity-30 cursor-not-allowed px-4 py-2 bg-slate-100 rounded-lg"' : 'class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold"'}>次へ</button>
+            </div>
+          </div>
+        ` : `
+          <!-- 夜モード -->
+          ${state.grammarCardIdx < 4 ? `
+            <div class="text-center py-4">
+              <div class="flex justify-between items-center mb-4">
+                <span class="px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-xs font-bold">1〜4問目：露 $\\rightarrow$ 日 復習</span>
+                <span class="text-xs text-slate-400">${state.grammarCardIdx + 1} / 5</span>
+              </div>
+              <div class="text-2xl font-bold text-slate-800 mb-6">${cur.ru}</div>
+              ${state.grammarMorningRevealed ? `
+                <div class="bg-amber-50 p-4 rounded-xl text-amber-900 font-medium mb-6">${cur.jp}</div>
+              ` : `
+                <button onclick="state.grammarMorningRevealed = true; render();" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 py-3 rounded-xl font-bold text-sm mb-6">日本語訳を確認する</button>
+              `}
+              <button onclick="state.grammarCardIdx++; state.grammarMorningRevealed = false; render();" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl">次の問題へ</button>
+            </div>
+          ` : `
+            <div class="py-2">
+              <span class="px-3 py-1 bg-rose-50 text-rose-600 rounded-full text-xs font-bold mb-4 inline-block">5問目：ピックアップ打つテスト</span>
+              <p class="text-sm text-slate-500 mb-2">以下の日本語をロシア語でタイピングしてください：</p>
+              <div class="text-xl font-bold text-slate-800 mb-4 bg-slate-50 p-3 rounded-xl border">${cur.jp}</div>
+              <input type="text" id="gQ5Input" value="${state.grammarNightQ5TypedText}" oninput="state.grammarNightQ5TypedText = this.value" placeholder="ロシア語を入力..." class="w-full p-3 border rounded-xl mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <button onclick="state.grammarNightQ5Checked = true; render();" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl mb-3">判定・答え合わせ</button>
+              ${state.grammarNightQ5Checked ? `
+                <div class="p-4 rounded-xl ${state.grammarNightQ5TypedText.trim() === cur.ru ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}">
+                  <p class="font-bold mb-1">${state.grammarNightQ5TypedText.trim() === cur.ru ? '◯ 正解です！' : '× 残念！'}</p>
+                  <p class="text-sm">正解: <span class="font-bold">${cur.ru}</span></p>
+                </div>
+              ` : ''}
+              <button onclick="state.grammarCardIdx = 0; state.grammarNightQ5Checked = false; state.grammarNightQ5TypedText = ''; render();" class="w-full mt-4 text-xs text-slate-400 hover:underline text-center">最初からやり直す</button>
+            </div>
+          `}
+        `}
+      `;
+    }
+
+    // --- 単語セクション ---
+    function renderVocabSection(words) {
+      return `
+        <!-- サブタブ -->
+        <div class="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl mb-5 text-xs font-bold text-center">
+          <button onclick="state.vocabSubTab = 'day1_m'; render();" class="py-2 rounded-lg ${state.vocabSubTab === 'day1_m' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}">1日目 朝<br>(たさた)</button>
+          <button onclick="state.vocabSubTab = 'day1_n'; render();" class="py-2 rounded-lg ${state.vocabSubTab === 'day1_n' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}">1日目 夜<br>(テスト)</button>
+          <button onclick="state.vocabSubTab = 'day2_m'; render();" class="py-2 rounded-lg ${state.vocabSubTab === 'day2_m' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}">2日目 朝<br>(暗記打つ)</button>
+          <button onclick="state.vocabSubTab = 'day2_n'; render();" class="py-2 rounded-lg ${state.vocabSubTab === 'day2_n' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}">2日目 夜<br>(意味だけ打つ)</button>
+        </div>
+
+        ${state.vocabSubTab === 'day1_m' ? `
+          <!-- 1日目 朝: 単語・読み・意味を一覧表示 -->
+          <div class="space-y-3">
+            ${words.map((w, idx) => `
+              <div class="p-3 bg-slate-50 border rounded-xl flex items-center justify-between">
+                <div>
+                  <div class="font-bold text-slate-800 text-lg">${w.ru}</div>
+                  <div class="text-xs text-indigo-600 font-medium">${w.reading}</div>
+                </div>
+                <div class="font-bold text-slate-700">${w.jp}</div>
+              </div>
+            `).join('')}
+          </div>
+        ` : state.vocabSubTab === 'day1_n' ? `
+          <!-- 1日目 夜: 露を表示 -> 日本語を答える -->
+          <div class="space-y-3">
+            ${words.map((w, idx) => `
+              <div class="p-3 bg-slate-50 border rounded-xl">
+                <div class="font-bold text-slate-800 text-lg mb-2">${w.ru}</div>
+                ${state.vocabNightChecked[idx] ? `
+                  <div class="text-sm font-bold text-indigo-600 bg-white p-2 rounded border">${w.jp} (${w.reading})</div>
+                ` : `
+                  <button onclick="state.vocabNightChecked[${idx}] = true; render();" class="w-full py-2 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-300">意味を確認する</button>
+                `}
+              </div>
+            `).join('')}
+          </div>
+        ` : state.vocabSubTab === 'day2_m' ? `
+          <!-- 2日目 朝: 日本語+読み表示 -> ロシア語打つ -->
+          <div class="space-y-4">
+            ${words.map((w, idx) => `
+              <div class="p-3 bg-slate-50 border rounded-xl space-y-2">
+                <div class="text-sm font-bold text-slate-700">${w.jp} <span class="text-xs text-indigo-600 font-normal">(${w.reading})</span></div>
+                <input type="text" oninput="state.vocabNightTyped[${idx}] = this.value" value="${state.vocabNightTyped[idx] || ''}" placeholder="ロシア語を打ち込む..." class="w-full p-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                <button onclick="state.vocabNightChecked[${idx}] = true; render();" class="w-full py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg">判定</button>
+                ${state.vocabNightChecked[idx] ? `
+                  <div class="text-xs font-bold ${ (state.vocabNightTyped[idx]||'').trim() === w.ru ? 'text-emerald-600' : 'text-rose-600' }">
+                    ${ (state.vocabNightTyped[idx]||'').trim() === w.ru ? '◯ 正解！' : `× 正解: ${w.ru}` }
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        ` : `
+          <!-- 2日目 夜: 日本語（意味）だけ表示 -> ロシア語打つ -->
+          <div class="space-y-4">
+            ${words.map((w, idx) => `
+              <div class="p-3 bg-slate-50 border rounded-xl space-y-2">
+                <div class="text-sm font-bold text-slate-800">${w.jp}</div>
+                <input type="text" oninput="state.vocabNightTyped[${idx}] = this.value" value="${state.vocabNightTyped[idx] || ''}" placeholder="ロシア語を打ち込む..." class="w-full p-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                <button onclick="state.vocabNightChecked[${idx}] = true; render();" class="w-full py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg">判定</button>
+                ${state.vocabNightChecked[idx] ? `
+                  <div class="text-xs font-bold ${ (state.vocabNightTyped[idx]||'').trim() === w.ru ? 'text-emerald-600' : 'text-rose-600' }">
+                    ${ (state.vocabNightTyped[idx]||'').trim() === w.ru ? '◯ 正解！' : `× 正解: ${w.ru}` }
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        `}
+      `;
+    }
+
+    // --- イベントハンドラー ---
+    function handleLogin(e) {
+      e.preventDefault();
+      if (state.passwordInput === SECRET_PASSWORD) {
+        state.isAuthenticated = true;
+        state.authError = false;
+        localStorage.setItem('ru_app_auth', 'true');
+      } else {
+        state.authError = true;
+      }
+      render();
+    }
+
+    function handleLogout() {
+      state.isAuthenticated = false;
+      localStorage.removeItem('ru_app_auth');
+      render();
+    }
+
+    function changeDate(days) {
+      const d = new Date(state.selectedDate);
+      d.setDate(d.getDate() + days);
+      state.selectedDate = d.toISOString().split('T')[0];
+      resetStateForNewDate();
+      render();
+    }
+
+    function setDate(dateStr) {
+      state.selectedDate = dateStr;
+      resetStateForNewDate();
+      render();
+    }
+
+    function resetStateForNewDate() {
+      state.grammarCardIdx = 0;
+      state.grammarMorningRevealed = false;
+      state.grammarNightQ5TypedText = '';
+      state.grammarNightQ5Checked = false;
+      state.vocabNightTyped = {};
+      state.vocabNightChecked = {};
+    }
+
+    function switchMainTab(tab) {
+      state.mainTab = tab;
+      render();
+    }
+
+    // 初期化
+    render();
+  </script>
+</body>
+</html>
