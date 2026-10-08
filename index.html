@@ -17,6 +17,9 @@
     // --- パスワード設定 ---
     const SECRET_PASSWORD = "5028"; 
 
+    // --- 基準日（明日 2026/10/09 を1日目とする） ---
+    const BASE_DATE_STR = "2026-10-09";
+
     // --- プールデータ ---
     const SENTENCES_POOL = [
       { ru: "Я читаю книгу.", jp: "私は本を読んでいます。" },
@@ -44,7 +47,7 @@
       { ru: "вечер", reading: "ヴェーチェル", jp: "夜・晩" }
     ];
 
-    // 本日の日付（文字列 YYYY-MM-DD）
+    // 本日の日付（YYYY-MM-DD）
     const TODAY_STR = new Date().toISOString().split('T')[0];
 
     // --- アプリの状態 (State) ---
@@ -53,17 +56,13 @@
       passwordInput: '',
       authError: false,
       
-      // カレンダー表示用（過去の達成記録確認専用）
-      viewDate: TODAY_STR,
-      
-      // 学習コンテンツのセット番号 (日付が変わるか更新ボタンでカウントアップ)
-      setIndex: parseInt(localStorage.getItem('ru_app_set_index') || '0', 10),
-      lastUpdateDate: localStorage.getItem('ru_app_last_date') || TODAY_STR,
-
       mainTab: 'grammar', // 'grammar' | 'vocab'
-      
-      // 達成記録 { "2026-10-09": { grammar: true, vocab: true } }
-      logs: JSON.parse(localStorage.getItem('ru_app_logs') || '{}'),
+
+      // 手動更新オフセット
+      manualOffset: parseInt(localStorage.getItem('ru_app_manual_offset') || '0', 10),
+
+      // 記録カレンダー用 { "2026-10-09": true }
+      historyLogs: JSON.parse(localStorage.getItem('ru_app_history_logs') || '{}'),
 
       // 文法状態
       grammarSubTab: 'morning',
@@ -78,39 +77,43 @@
       vocabNightChecked: {}
     };
 
-    // 自動日付更新チェック（日付をまたいだら自動で次のセットへ）
-    if (state.lastUpdateDate !== TODAY_STR) {
-      state.setIndex += 1;
-      state.lastUpdateDate = TODAY_STR;
-      localStorage.setItem('ru_app_set_index', state.setIndex.toString());
-      localStorage.setItem('ru_app_last_date', TODAY_STR);
+    // 2日1セットの自動計算（2026/10/09を開始日とする）
+    function getCurrentSetIndex() {
+      const base = new Date(BASE_DATE_STR);
+      const today = new Date(TODAY_STR);
+      const diffDays = Math.floor((today - base) / (1000 * 60 * 60 * 24));
+      
+      // 2日で1セット進行
+      let cycle = Math.floor(diffDays / 2);
+      if (cycle < 0) cycle = 0;
+      
+      return cycle + state.manualOffset;
     }
 
     // 現在のセットに対応する問題データを取得
     function getCurrentData() {
+      const setIdx = getCurrentSetIndex();
       const sentences = [];
       const words = [];
       for (let i = 0; i < 5; i++) {
-        sentences.push(SENTENCES_POOL[(state.setIndex * 5 + i) % SENTENCES_POOL.length]);
-        words.push(WORDS_POOL[(state.setIndex * 5 + i) % WORDS_POOL.length]);
+        sentences.push(SENTENCES_POOL[(setIdx * 5 + i) % SENTENCES_POOL.length]);
+        words.push(WORDS_POOL[(setIdx * 5 + i) % WORDS_POOL.length]);
       }
-      return { sentences, words };
+      return { sentences, words, setIdx };
     }
 
-    // 手動で問題セットを更新する
+    // 手動更新（次のセットへ進める）
     function forceNextSet() {
-      state.setIndex += 1;
-      localStorage.setItem('ru_app_set_index', state.setIndex.toString());
+      state.manualOffset += 1;
+      localStorage.setItem('ru_app_manual_offset', state.manualOffset.toString());
       resetLearningState();
       render();
     }
 
-    function toggleLog(type) {
-      if (!state.logs[state.viewDate]) {
-        state.logs[state.viewDate] = {};
-      }
-      state.logs[state.viewDate][type] = !state.logs[state.viewDate][type];
-      localStorage.setItem('ru_app_logs', JSON.stringify(state.logs));
+    // 日付ごとの「やったかどうかの確認」トグル
+    function toggleHistory(dateStr) {
+      state.historyLogs[dateStr] = !state.historyLogs[dateStr];
+      localStorage.setItem('ru_app_history_logs', JSON.stringify(state.historyLogs));
       render();
     }
 
@@ -148,45 +151,26 @@
       }
 
       const currentData = getCurrentData();
-      const viewLogs = state.logs[state.viewDate] || {};
 
       app.innerHTML = `
-        <!-- カレンダーパネル（過去ログの記録・確認専用） -->
-        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mb-3">
-          <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center space-x-1">
-              <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
-              <span class="text-xs font-bold text-slate-500">達成記録の確認</span>
-            </div>
-            <button onclick="handleLogout()" class="text-xs text-slate-400 hover:text-red-500 flex items-center space-x-1">
-              <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
-              <span>ロック</span>
-            </button>
-          </div>
-          <div class="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
-            <input type="date" value="${state.viewDate}" onchange="state.viewDate = this.value; render();" class="font-bold text-slate-700 bg-transparent focus:outline-none text-sm">
-            <div class="flex space-x-2 text-xs font-bold">
-              <button onclick="toggleLog('grammar')" class="px-2.5 py-1 rounded-lg border flex items-center space-x-1 ${viewLogs.grammar ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-slate-400 border-slate-200'}">
-                <i data-lucide="${viewLogs.grammar ? 'check-circle-2' : 'circle'}" class="w-3.5 h-3.5"></i>
-                <span>文法</span>
-              </button>
-              <button onclick="toggleLog('vocab')" class="px-2.5 py-1 rounded-lg border flex items-center space-x-1 ${viewLogs.vocab ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-slate-400 border-slate-200'}">
-                <i data-lucide="${viewLogs.vocab ? 'check-circle-2' : 'circle'}" class="w-3.5 h-3.5"></i>
-                <span>単語</span>
-              </button>
-            </div>
-          </div>
+        <!-- ヘッダー (タイトル ＆ ロック) -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mb-4 flex items-center justify-between">
+          <div class="font-bold text-slate-800 text-lg">ロシア語 日課学習</div>
+          <button onclick="handleLogout()" class="text-xs text-slate-400 hover:text-red-500 flex items-center space-x-1">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+            <span>ロック</span>
+          </button>
         </div>
 
-        <!-- 現在の問題セット & 更新ボタン -->
+        <!-- 学習セット情報 ＆ 手動更新ボタン -->
         <div class="bg-indigo-900 text-white rounded-2xl p-4 shadow-sm mb-4 flex justify-between items-center">
           <div>
-            <div class="text-xs text-indigo-200">現在の学習セット</div>
-            <div class="text-lg font-bold">セット #${state.setIndex + 1}</div>
+            <div class="text-xs text-indigo-200">問題セット（日付変更で自動更新）</div>
+            <div class="text-lg font-bold">セット #${currentData.setIdx + 1}</div>
           </div>
           <button onclick="forceNextSet()" class="bg-indigo-700 hover:bg-indigo-600 text-xs px-3 py-2 rounded-xl border border-indigo-500 flex items-center space-x-1 transition">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-            <span>新しい問題に更新</span>
+            <span>手動で更新</span>
           </button>
         </div>
 
@@ -201,10 +185,25 @@
         </div>
 
         <!-- コンテンツエリア -->
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80 mb-6">
           ${state.mainTab === 'grammar' 
             ? renderGrammarSection(currentData.sentences) 
             : renderVocabSection(currentData.words)}
+        </div>
+
+        <!-- やったかどうか確認・記録用の専用カレンダー -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+          <div class="flex items-center space-x-2 mb-3">
+            <i data-lucide="calendar" class="w-4 h-4 text-indigo-600"></i>
+            <span class="text-sm font-bold text-slate-700">実施記録カレンダー（確認用）</span>
+          </div>
+          <div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <span class="text-xs font-bold text-slate-500">本日の学習（${TODAY_STR}）</span>
+            <button onclick="toggleHistory('${TODAY_STR}')" class="px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center space-x-1.5 transition ${state.historyLogs[TODAY_STR] ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-slate-400 border-slate-200'}">
+              <i data-lucide="${state.historyLogs[TODAY_STR] ? 'check-circle-2' : 'circle'}" class="w-4 h-4"></i>
+              <span>${state.historyLogs[TODAY_STR] ? '本日完了' : '未完了'}</span>
+            </button>
+          </div>
         </div>
       `;
       lucide.createIcons();
@@ -267,11 +266,11 @@
       `;
     }
 
-    // --- 単語セクション（シンプル表示） ---
+    // --- 単語セクション（タブなし・シンプル表示） ---
     function renderVocabSection(words) {
       return `
         ${state.vocabMode === 'study' ? `
-          <!-- 暗記モード（ロシア語・カタカナ読み・日本語） -->
+          <!-- 暗記一覧表示 -->
           <div class="space-y-3 mb-6">
             ${words.map((w) => `
               <div class="p-3.5 bg-slate-50 border rounded-xl flex items-center justify-between">
