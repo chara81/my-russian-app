@@ -15,10 +15,7 @@
 
   <script>
     // --- パスワード設定 ---
-    const SECRET_PASSWORD = "1234"; 
-
-    // --- 基準日の設定 (2026/10/09 を 1日目 とする) ---
-    const BASE_DATE_STR = "2026-10-09";
+    const SECRET_PASSWORD = "5028"; 
 
     // --- プールデータ ---
     const SENTENCES_POOL = [
@@ -47,17 +44,25 @@
       { ru: "вечер", reading: "ヴェーチェル", jp: "夜・晩" }
     ];
 
+    // 本日の日付（文字列 YYYY-MM-DD）
+    const TODAY_STR = new Date().toISOString().split('T')[0];
+
     // --- アプリの状態 (State) ---
     let state = {
       isAuthenticated: false,
       passwordInput: '',
       authError: false,
       
-      selectedDate: new Date().toISOString().split('T')[0],
-      manualSetOffset: 0, // 手動更新用のオフセット
+      // カレンダー表示用（過去の達成記録確認専用）
+      viewDate: TODAY_STR,
       
+      // 学習コンテンツのセット番号 (日付が変わるか更新ボタンでカウントアップ)
+      setIndex: parseInt(localStorage.getItem('ru_app_set_index') || '0', 10),
+      lastUpdateDate: localStorage.getItem('ru_app_last_date') || TODAY_STR,
+
       mainTab: 'grammar', // 'grammar' | 'vocab'
       
+      // 達成記録 { "2026-10-09": { grammar: true, vocab: true } }
       logs: JSON.parse(localStorage.getItem('ru_app_logs') || '{}'),
 
       // 文法状態
@@ -68,47 +73,55 @@
       grammarNightQ5Checked: false,
       
       // 単語状態
-      vocabMode: 'study', // 'study' | 'test'
+      vocabMode: 'study', // 'study' (暗記) | 'test' (テスト)
       vocabNightTyped: {},
       vocabNightChecked: {}
     };
 
-    // --- 2日1セットの計算とデータ生成 ---
-    function getCycleInfo(dateStr) {
-      const baseDate = new Date(BASE_DATE_STR);
-      const targetDate = new Date(dateStr);
-      
-      // UTCベースで日付差（日数）を計算
-      const diffTime = targetDate.getTime() - baseDate.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
-      
-      // 2日で1セット
-      let cycleIndex = Math.floor(diffDays / 2) + state.manualSetOffset;
-      if (cycleIndex < 0) cycleIndex = Math.abs(cycleIndex);
-      
-      // 1日目(1)か2日目(2)か
-      const dayInCycle = ((diffDays % 2) + 2) % 2 === 0 ? 1 : 2;
-      
-      return { cycleIndex, dayInCycle };
+    // 自動日付更新チェック（日付をまたいだら自動で次のセットへ）
+    if (state.lastUpdateDate !== TODAY_STR) {
+      state.setIndex += 1;
+      state.lastUpdateDate = TODAY_STR;
+      localStorage.setItem('ru_app_set_index', state.setIndex.toString());
+      localStorage.setItem('ru_app_last_date', TODAY_STR);
     }
 
-    function getSetData(cycleIndex) {
+    // 現在のセットに対応する問題データを取得
+    function getCurrentData() {
       const sentences = [];
       const words = [];
       for (let i = 0; i < 5; i++) {
-        sentences.push(SENTENCES_POOL[(cycleIndex * 5 + i) % SENTENCES_POOL.length]);
-        words.push(WORDS_POOL[(cycleIndex * 5 + i) % WORDS_POOL.length]);
+        sentences.push(SENTENCES_POOL[(state.setIndex * 5 + i) % SENTENCES_POOL.length]);
+        words.push(WORDS_POOL[(state.setIndex * 5 + i) % WORDS_POOL.length]);
       }
       return { sentences, words };
     }
 
+    // 手動で問題セットを更新する
+    function forceNextSet() {
+      state.setIndex += 1;
+      localStorage.setItem('ru_app_set_index', state.setIndex.toString());
+      resetLearningState();
+      render();
+    }
+
     function toggleLog(type) {
-      if (!state.logs[state.selectedDate]) {
-        state.logs[state.selectedDate] = {};
+      if (!state.logs[state.viewDate]) {
+        state.logs[state.viewDate] = {};
       }
-      state.logs[state.selectedDate][type] = !state.logs[state.selectedDate][type];
+      state.logs[state.viewDate][type] = !state.logs[state.viewDate][type];
       localStorage.setItem('ru_app_logs', JSON.stringify(state.logs));
       render();
+    }
+
+    function resetLearningState() {
+      state.grammarCardIdx = 0;
+      state.grammarMorningRevealed = false;
+      state.grammarNightQ5TypedText = '';
+      state.grammarNightQ5Checked = false;
+      state.vocabMode = 'study';
+      state.vocabNightTyped = {};
+      state.vocabNightChecked = {};
     }
 
     // --- メインレンダリング ---
@@ -134,48 +147,46 @@
         return;
       }
 
-      const cycle = getCycleInfo(state.selectedDate);
-      const setData = getSetData(cycle.cycleIndex);
-      const currentLogs = state.logs[state.selectedDate] || {};
+      const currentData = getCurrentData();
+      const viewLogs = state.logs[state.viewDate] || {};
 
       app.innerHTML = `
-        <!-- カレンダー & 日付変更（実績確認用） -->
-        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mb-3 flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <button onclick="changeDate(-1)" class="p-2 hover:bg-slate-100 rounded-lg text-slate-600"><i data-lucide="chevron-left"></i></button>
-            <input type="date" value="${state.selectedDate}" onchange="setDate(this.value)" class="font-bold text-slate-700 bg-transparent focus:outline-none">
-            <button onclick="changeDate(1)" class="p-2 hover:bg-slate-100 rounded-lg text-slate-600"><i data-lucide="chevron-right"></i></button>
+        <!-- カレンダーパネル（過去ログの記録・確認専用） -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mb-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center space-x-1">
+              <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
+              <span class="text-xs font-bold text-slate-500">達成記録の確認</span>
+            </div>
+            <button onclick="handleLogout()" class="text-xs text-slate-400 hover:text-red-500 flex items-center space-x-1">
+              <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+              <span>ロック</span>
+            </button>
           </div>
-          <button onclick="handleLogout()" class="text-xs text-slate-400 hover:text-red-500 flex items-center space-x-1">
-            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
-            <span>ロック</span>
-          </button>
+          <div class="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
+            <input type="date" value="${state.viewDate}" onchange="state.viewDate = this.value; render();" class="font-bold text-slate-700 bg-transparent focus:outline-none text-sm">
+            <div class="flex space-x-2 text-xs font-bold">
+              <button onclick="toggleLog('grammar')" class="px-2.5 py-1 rounded-lg border flex items-center space-x-1 ${viewLogs.grammar ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-slate-400 border-slate-200'}">
+                <i data-lucide="${viewLogs.grammar ? 'check-circle-2' : 'circle'}" class="w-3.5 h-3.5"></i>
+                <span>文法</span>
+              </button>
+              <button onclick="toggleLog('vocab')" class="px-2.5 py-1 rounded-lg border flex items-center space-x-1 ${viewLogs.vocab ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-slate-400 border-slate-200'}">
+                <i data-lucide="${viewLogs.vocab ? 'check-circle-2' : 'circle'}" class="w-3.5 h-3.5"></i>
+                <span>単語</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <!-- 学習サイクル情報 & 手動更新ボタン -->
+        <!-- 現在の問題セット & 更新ボタン -->
         <div class="bg-indigo-900 text-white rounded-2xl p-4 shadow-sm mb-4 flex justify-between items-center">
           <div>
-            <div class="text-xs text-indigo-200">2日1セット管理システム</div>
-            <div class="text-base font-bold flex items-center space-x-2 mt-0.5">
-              <span>セット #${cycle.cycleIndex + 1}</span>
-              <span class="bg-indigo-700 text-indigo-100 text-xs px-2 py-0.5 rounded-md font-normal">${cycle.dayInCycle}日目</span>
-            </div>
+            <div class="text-xs text-indigo-200">現在の学習セット</div>
+            <div class="text-lg font-bold">セット #${state.setIndex + 1}</div>
           </div>
           <button onclick="forceNextSet()" class="bg-indigo-700 hover:bg-indigo-600 text-xs px-3 py-2 rounded-xl border border-indigo-500 flex items-center space-x-1 transition">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-            <span>次セットへ更新</span>
-          </button>
-        </div>
-
-        <!-- チェックパネル（実施確認のみ） -->
-        <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200/80 mb-4 flex justify-around text-xs font-bold">
-          <button onclick="toggleLog('grammar')" class="flex items-center space-x-1 px-3 py-1.5 rounded-lg border ${currentLogs.grammar ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-400 border-slate-200'}">
-            <i data-lucide="${currentLogs.grammar ? 'check-circle-2' : 'circle'}" class="w-4 h-4"></i>
-            <span>文法 完了</span>
-          </button>
-          <button onclick="toggleLog('vocab')" class="flex items-center space-x-1 px-3 py-1.5 rounded-lg border ${currentLogs.vocab ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-400 border-slate-200'}">
-            <i data-lucide="${currentLogs.vocab ? 'check-circle-2' : 'circle'}" class="w-4 h-4"></i>
-            <span>単語 完了</span>
+            <span>新しい問題に更新</span>
           </button>
         </div>
 
@@ -185,15 +196,15 @@
             文法
           </button>
           <button onclick="switchMainTab('vocab')" class="py-2.5 rounded-lg text-sm font-bold transition ${state.mainTab === 'vocab' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
-            単語 (${cycle.dayInCycle}日目)
+            単語
           </button>
         </div>
 
         <!-- コンテンツエリア -->
         <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
           ${state.mainTab === 'grammar' 
-            ? renderGrammarSection(setData.sentences) 
-            : renderVocabSection(setData.words, cycle.dayInCycle)}
+            ? renderGrammarSection(currentData.sentences) 
+            : renderVocabSection(currentData.words)}
         </div>
       `;
       lucide.createIcons();
@@ -256,20 +267,11 @@
       `;
     }
 
-    // --- 単語セクション ---
-    function renderVocabSection(words, dayInCycle) {
+    // --- 単語セクション（シンプル表示） ---
+    function renderVocabSection(words) {
       return `
-        <div class="flex justify-between items-center mb-4 pb-2 border-b">
-          <div class="font-bold text-slate-700">
-            ${dayInCycle === 1 ? '1日目：意味確認テスト' : '2日目：タイピングテスト'}
-          </div>
-          ${state.vocabMode === 'test' ? `
-            <button onclick="state.vocabMode = 'study'; render();" class="text-xs text-indigo-600 font-bold hover:underline">暗記一覧に戻る</button>
-          ` : ''}
-        </div>
-
         ${state.vocabMode === 'study' ? `
-          <!-- 暗記モード（ロシア語・カタカナ読み・意味の表示） -->
+          <!-- 暗記モード（ロシア語・カタカナ読み・日本語） -->
           <div class="space-y-3 mb-6">
             ${words.map((w) => `
               <div class="p-3.5 bg-slate-50 border rounded-xl flex items-center justify-between">
@@ -287,36 +289,25 @@
           </button>
         ` : `
           <!-- テストモード -->
-          ${dayInCycle === 1 ? `
-            <!-- 1日目：ロシア語を見て意味を確認 -->
-            <div class="space-y-3">
-              ${words.map((w, idx) => `
-                <div class="p-3 bg-slate-50 border rounded-xl">
-                  <div class="font-bold text-slate-800 text-lg mb-2">${w.ru}</div>${state.vocabNightChecked[idx] ? `
-                    <div class="text-sm font-bold text-indigo-600 bg-white p-2 rounded border">${w.jp} (${w.reading})</div>
-                  ` : `
-                    <button onclick="state.vocabNightChecked[${idx}] = true; render();" class="w-full py-2 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-300">意味を確認する</button>
-                  `}
-                </div>
-              `).join('')}
-            </div>
-          ` : `
-            <!-- 2日目：日本語を見てロシア語入力 -->
-            <div class="space-y-4">
-              ${words.map((w, idx) => `
-                <div class="p-3 bg-slate-50 border rounded-xl space-y-2">
-                  <div class="text-sm font-bold text-slate-800">${w.jp}</div>
-                  <input type="text" oninput="state.vocabNightTyped[${idx}] = this.value" value="${state.vocabNightTyped[idx] || ''}" placeholder="ロシア語を入力..." class="w-full p-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
-                  <button onclick="state.vocabNightChecked[${idx}] = true; render();" class="w-full py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg">判定</button>
-                  ${state.vocabNightChecked[idx] ? `
-                    <div class="text-xs font-bold ${ (state.vocabNightTyped[idx]||'').trim() === w.ru ? 'text-emerald-600' : 'text-rose-600' }">
-                      ${ (state.vocabNightTyped[idx]||'').trim() === w.ru ? '◯ 正解！' : `× 正解: ${w.ru}` }
-                    </div>
-                  ` : ''}
-                </div>
-              `).join('')}
-            </div>
-          `}
+          <div class="flex justify-between items-center mb-4 pb-2 border-b">
+            <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">単語テスト</span>
+            <button onclick="state.vocabMode = 'study'; render();" class="text-xs text-slate-400 hover:text-slate-600">一覧（暗記）に戻る</button>
+          </div>
+
+          <div class="space-y-4">
+            ${words.map((w, idx) => `
+              <div class="p-3 bg-slate-50 border rounded-xl space-y-2">
+                <div class="text-sm font-bold text-slate-800">${w.jp} (${w.reading})</div>
+                <input type="text" oninput="state.vocabNightTyped[${idx}] = this.value" value="${state.vocabNightTyped[idx] || ''}" placeholder="ロシア語を入力..." class="w-full p-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                <button onclick="state.vocabNightChecked[${idx}] = true; render();" class="w-full py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg">判定</button>
+                ${state.vocabNightChecked[idx] ? `
+                  <div class="text-xs font-bold ${ (state.vocabNightTyped[idx]||'').trim() === w.ru ? 'text-emerald-600' : 'text-rose-600' }">
+                    ${ (state.vocabNightTyped[idx]||'').trim() === w.ru ? '◯ 正解！' : `× 正解: ${w.ru}` }
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
         `}
       `;
     }
@@ -337,36 +328,6 @@
     function handleLogout() {
       state.isAuthenticated = false;
       render();
-    }
-
-    function changeDate(days) {
-      const d = new Date(state.selectedDate);
-      d.setDate(d.getDate() + days);
-      state.selectedDate = d.toISOString().split('T')[0];
-      resetStateForNewDate();
-      render();
-    }
-
-    function setDate(dateStr) {
-      state.selectedDate = dateStr;
-      resetStateForNewDate();
-      render();
-    }
-
-    function forceNextSet() {
-      state.manualSetOffset += 1;
-      resetStateForNewDate();
-      render();
-    }
-
-    function resetStateForNewDate() {
-      state.grammarCardIdx = 0;
-      state.grammarMorningRevealed = false;
-      state.grammarNightQ5TypedText = '';
-      state.grammarNightQ5Checked = false;
-      state.vocabMode = 'study';
-      state.vocabNightTyped = {};
-      state.vocabNightChecked = {};
     }
 
     function switchMainTab(tab) {
