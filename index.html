@@ -15,12 +15,12 @@
 
   <script>
     // --- パスワード設定 ---
-    const SECRET_PASSWORD = "1234"; 
+    const SECRET_PASSWORD = "5028"; 
 
-    // --- 基準日（2026/10/09 をセットの1日目とする） ---
+    // --- 基準日（2026/10/09 をセット1の開始日とする） ---
     const BASE_DATE_STR = "2026-10-09";
 
-    // --- プールデータ ---
+    // --- 問題プール（文法 30文 / 単語 30語） ---
     const SENTENCES_POOL = [
       { ru: "Я читаю книгу.", jp: "私は本を読んでいます。" },
       { ru: "Он пишет письма.", jp: "彼は手紙を書いています。" },
@@ -31,7 +31,27 @@
       { ru: "Я люблю слушать музыку.", jp: "私は音楽を聴くのが好きです。" },
       { ru: "Брат работает в банке.", jp: "兄は銀行で働いています。" },
       { ru: "Сестра пьет горячий чай.", jp: "姉は温かいお茶を飲んでいます。" },
-      { ru: "Мой друг хорошо говорит.", jp: "私の友達は上手に話します。" }
+      { ru: "Мой друг хорошо говорит.", jp: "私の友達は上手に話します。" },
+      { ru: "Я хочу купить хлеб.", jp: "私はパンを買いたいです。" },
+      { ru: "Где находится станция?", jp: "駅はどこにありますか？" },
+      { ru: "Сегодня хорошая погода.", jp: "今日は良い天気です。" },
+      { ru: "Мы завтракаем утром.", jp: "私たちは朝に朝食を食べます。" },
+      { ru: "Он хорошо знает этот город.", jp: "彼はこの街をよく知っています。" },
+      { ru: "Она пьет кофе без сахара.", jp: "彼女は砂糖なしのコーヒーを飲みます。" },
+      { ru: "Вы были в Москве?", jp: "あなたはモスクワに行ったことがありますか？" },
+      { ru: "Дети играют в парке.", jp: "子供たちが公園で遊んでいます。" },
+      { ru: "Я знаю ответ на вопрос.", jp: "私は質問の答えを知っています。" },
+      { ru: "Мама готовит вкусный суп.", jp: "お母さんが美味しいスープを作っています。" },
+      { ru: "У меня есть собака.", jp: "私には犬がいます。" },
+      { ru: "Этот магазин открыт.", jp: "この店は開いています。" },
+      { ru: "Мы слушаем радио.", jp: "私たちはラジオを聞いています。" },
+      { ru: "Она идет в школу.", jp: "彼女は学校に行きます。" },
+      { ru: "Сколько это стоит?", jp: "これはいくらですか？" },
+      { ru: "Я изучаю историю.", jp: "私は歴史を学んでいます。" },
+      { ru: "Он ждет автобус.", jp: "彼はバスを待っています。" },
+      { ru: "Завтра будет солнце.", jp: "明日は晴れるでしょう。" },
+      { ru: "Мы любим путешествовать.", jp: "私たちは旅行をするのが好きです。" },
+      { ru: "Спасибо за помощь.", jp: "助けてくれてありがとう。" }
     ];
 
     const WORDS_POOL = [
@@ -44,15 +64,35 @@
       { ru: "слово", reading: "スローヴォ", jp: "言葉・単語" },
       { ru: "семья", reading: "セミヤー", jp: "家族" },
       { ru: "утро", reading: "ウートロ", jp: "朝" },
-      { ru: "вечер", reading: "ヴェーチェル", jp: "夜・晩" }
+      { ru: "вечер", reading: "ヴェーチェル", jp: "夜・晩" },
+      { ru: "вода", reading: "ヴァダー", jp: "水" },
+      { ru: "хлеб", reading: "フレープ", jp: "パン" },
+      { ru: "чай", reading: "チャイ", jp: "お茶" },
+      { ru: "дом", reading: "ドム", jp: "家・建物" },
+      { ru: "улица", reading: "ウーリツァ", jp: "通り・道" },
+      { ru: "машина", reading: "マシーナ", jp: "車" },
+      { ru: "деньги", reading: "ジエンギ", jp: "お金" },
+      { ru: "человек", reading: "チェロヴェーク", jp: "人・人間" },
+      { ru: "магазин", reading: "マガズィン", jp: "店・ショップ" },
+      { ru: "погода", reading: "パゴーダ", jp: "天気" },
+      { ru: "дверь", reading: "ドヴェーリ", jp: "ドア・扉" },
+      { ru: "окно", reading: "アクノー", jp: "窓" },
+      { ru: "стол", reading: "ストール", jp: "机・テーブル" },
+      { ru: "стул", reading: "ストゥール", jp: "椅子" },
+      { ru: "ручка", reading: "ルーチカ", jp: "ペン" },
+      { ru: "тетрадь", reading: "チトラージ", jp: "ノート" },
+      { ru: "яблоко", reading: "ヤーブラコ", jp: "りんご" },
+      { ru: "молоко", reading: "マラコー", jp: "牛乳" },
+      { ru: "рыба", reading: "ルィーバ", jp: "魚" },
+      { ru: "мясо", reading: "ミャーサ", jp: "肉" }
     ];
 
-    // 現在の日付を取得 (YYYY-MM-DD)
+    // 現在の正確な日付文字列 (YYYY-MM-DD) を取得
     function getTodayStr() {
-      const d = new Date();
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     }
 
@@ -64,10 +104,13 @@
       
       mainTab: 'grammar', // 'grammar' | 'vocab'
 
+      // 記録カレンダーで選択中の日付（初期値は今日）
+      selectedRecordDate: getTodayStr(),
+
       // 手動更新オフセット
       manualOffset: parseInt(localStorage.getItem('ru_app_manual_offset') || '0', 10),
 
-      // 実施記録用データ { "2026-10-11": true }
+      // 実施記録保存データ { "2026-10-11": true }
       historyLogs: JSON.parse(localStorage.getItem('ru_app_history_logs') || '{}'),
 
       // 文法状態
@@ -83,11 +126,17 @@
       vocabNightChecked: {}
     };
 
-    // 2日1セットの自動計算（日付ベース）
+    // 2日1セットの自動計算（2026-10-09ベース）
     function getCurrentSetIndex() {
-      const base = new Date(BASE_DATE_STR);
-      const today = new Date(getTodayStr());
-      const diffDays = Math.floor((today - base) / (1000 * 60 * 60 * 24));
+      const todayStr = getTodayStr();
+      const baseParts = BASE_DATE_STR.split('-').map(Number);
+      const todayParts = todayStr.split('-').map(Number);
+      
+      const baseDate = new Date(baseParts[0], baseParts[1] - 1, baseParts[2]);
+      const todayDate = new Date(todayParts[0], todayParts[1] - 1, todayParts[2]);
+      
+      const diffMs = todayDate.getTime() - baseDate.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
       
       let cycle = Math.floor(diffDays / 2);
       if (cycle < 0) cycle = 0;
@@ -100,14 +149,17 @@
       const setIdx = getCurrentSetIndex();
       const sentences = [];
       const words = [];
+      
       for (let i = 0; i < 5; i++) {
-        sentences.push(SENTENCES_POOL[(setIdx * 5 + i) % SENTENCES_POOL.length]);
-        words.push(WORDS_POOL[(setIdx * 5 + i) % WORDS_POOL.length]);
+        const sentenceIndex = (setIdx * 5 + i) % SENTENCES_POOL.length;
+        const wordIndex = (setIdx * 5 + i) % WORDS_POOL.length;
+        sentences.push(SENTENCES_POOL[sentenceIndex]);
+        words.push(WORDS_POOL[wordIndex]);
       }
       return { sentences, words, setIdx };
     }
 
-    // 手動更新（次のセットへ進める）
+    // 手動更新（次の問題セットへ進める）
     function forceNextSet() {
       state.manualOffset += 1;
       localStorage.setItem('ru_app_manual_offset', state.manualOffset.toString());
@@ -115,7 +167,14 @@
       render();
     }
 
-    // 日付ごとの「やったかどうかの確認」トグル
+    // 記録カレンダーの日付変更処理
+    function handleRecordDateChange(newDate) {
+      if (!newDate) return;
+      state.selectedRecordDate = newDate;
+      render();
+    }
+
+    // 選択された日付の「やったかどうか」の記録トグル
     function toggleHistory(dateStr) {
       state.historyLogs[dateStr] = !state.historyLogs[dateStr];
       localStorage.setItem('ru_app_history_logs', JSON.stringify(state.historyLogs));
@@ -155,8 +214,9 @@
         return;
       }
 
-      const todayStr = getTodayStr();
       const currentData = getCurrentData();
+      const recDate = state.selectedRecordDate;
+      const isCompleted = !!state.historyLogs[recDate];
 
       app.innerHTML = `
         <!-- ヘッダー (タイトル ＆ ロック) -->
@@ -171,7 +231,7 @@
         <!-- 学習セット情報 ＆ 手動更新ボタン -->
         <div class="bg-indigo-900 text-white rounded-2xl p-4 shadow-sm mb-4 flex justify-between items-center">
           <div>
-            <div class="text-xs text-indigo-200">問題セット（日付変更で自動更新）</div>
+            <div class="text-xs text-indigo-200">問題セット（2日で自動更新）</div>
             <div class="text-lg font-bold">セット #${currentData.setIdx + 1}</div>
           </div>
           <button onclick="forceNextSet()" class="bg-indigo-700 hover:bg-indigo-600 text-xs px-3 py-2 rounded-xl border border-indigo-500 flex items-center space-x-1 transition">
@@ -197,17 +257,19 @@
             : renderVocabSection(currentData.words)}
         </div>
 
-        <!-- やったかどうか確認・記録用の専用領域 -->
+        <!-- やったかどうか確認・記録用の専用領域（日付切り替え機能付き） -->
         <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
           <div class="flex items-center space-x-2 mb-3">
             <i data-lucide="calendar" class="w-4 h-4 text-indigo-600"></i>
             <span class="text-sm font-bold text-slate-700">実施記録（確認用）</span>
           </div>
           <div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
-            <span class="text-xs font-bold text-slate-500">本日の学習（${todayStr}）</span>
-            <button onclick="toggleHistory('${todayStr}')" class="px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center space-x-1.5 transition ${state.historyLogs[todayStr] ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-slate-400 border-slate-200'}">
-              <i data-lucide="${state.historyLogs[todayStr] ? 'check-circle-2' : 'circle'}" class="w-4 h-4"></i>
-              <span>${state.historyLogs[todayStr] ? '本日完了' : '未完了'}</span>
+            <div class="flex items-center space-x-2">
+              <input type="date" value="${recDate}" onchange="handleRecordDateChange(this.value)" class="bg-white border border-slate-200 text-slate-700 font-bold text-xs p-1.5 rounded-lg focus:outline-none">
+            </div>
+            <button onclick="toggleHistory('${recDate}')" class="px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center space-x-1.5 transition ${isCompleted ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-slate-400 border-slate-200'}">
+              <i data-lucide="${isCompleted ? 'check-circle-2' : 'circle'}" class="w-4 h-4"></i>
+              <span>${isCompleted ? '完了' : '未完了'}</span>
             </button>
           </div>
         </div>
@@ -336,11 +398,4 @@
     }
 
     function switchMainTab(tab) {
-      state.mainTab = tab;
-      render();
-    }
-
-    render();
-  </script>
-</body>
-</html>
+      st
