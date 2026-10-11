@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- キャッシュ無効化タグ（毎回最新コードを読み込む設定） -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>ロシア語日課学習アプリ</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -13,9 +17,6 @@
   <div id="app" class="max-w-xl mx-auto"></div>
 
   <script>
-    // 古い破損データの競合を防止
-    try { localStorage.removeItem('ru_app_logs'); } catch(e){}
-
     const SECRET_PASSWORD = "5028"; 
     const BASE_DATE_STR = "2026-10-09";
 
