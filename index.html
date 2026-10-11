@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- キャッシュ無効化タグ（毎回最新コードを読み込む設定） -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -94,13 +93,24 @@
       return y + "-" + m + "-" + d;
     }
 
+    // 日付文字列に日数を加算するユーティリティ
+    function addDaysToStr(dateStr, days) {
+      const parts = dateStr.split('-').map(Number);
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      d.setDate(d.getDate() + days);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return y + "-" + m + "-" + day;
+    }
+
     let state = {
       isAuthenticated: false,
       passwordInput: '',
       authError: false,
       mainTab: 'grammar',
-      selectedRecordDate: getTodayStr(),
       manualOffset: parseInt(localStorage.getItem('ru_app_manual_offset') || '0', 10),
+      selectedRecordDate: null,
       historyLogs: JSON.parse(localStorage.getItem('ru_app_history_logs') || '{}'),
       grammarSubTab: 'morning',
       grammarCardIdx: 0,
@@ -124,6 +134,13 @@
       return cycle + state.manualOffset;
     }
 
+    // 現在のセットに該当する実質的な表示用日付を取得
+    function getEffectiveDateStr() {
+      if (state.selectedRecordDate) return state.selectedRecordDate;
+      const todayStr = getTodayStr();
+      return addDaysToStr(todayStr, state.manualOffset * 2);
+    }
+
     function getCurrentData() {
       const setIdx = getCurrentSetIndex();
       const sentences = [];
@@ -135,9 +152,11 @@
       return { sentences, words, setIdx };
     }
 
+    // 手動更新時にオフセットを加算し、記録用の選択日付もその分連動させる
     function forceNextSet() {
       state.manualOffset += 1;
       localStorage.setItem('ru_app_manual_offset', state.manualOffset.toString());
+      state.selectedRecordDate = addDaysToStr(getEffectiveDateStr(), 2);
       resetLearningState();
       render();
     }
@@ -183,7 +202,7 @@
       }
 
       const currentData = getCurrentData();
-      const recDate = state.selectedRecordDate;
+      const recDate = getEffectiveDateStr();
       const isCompleted = !!state.historyLogs[recDate];
 
       let contentHtml = '';
@@ -198,12 +217,8 @@
           '<div class="font-bold text-slate-800 text-lg">ロシア語 日課学習</div>' +
           '<button onclick="handleLogout()" class="text-xs text-slate-400 hover:text-red-500">ロック</button>' +
         '</div>' +
-        '<div class="bg-indigo-900 text-white rounded-2xl p-4 shadow-sm mb-4 flex justify-between items-center">' +
-          '<div>' +
-            '<div class="text-xs text-indigo-200">問題セット（2日で自動更新）</div>' +
-            '<div class="text-lg font-bold">セット #' + (currentData.setIdx + 1) + '</div>' +
-          '</div>' +
-          '<button onclick="forceNextSet()" class="bg-indigo-700 hover:bg-indigo-600 text-xs px-3 py-2 rounded-xl border border-indigo-500">手動で更新</button>' +
+        '<div class="bg-indigo-900 text-white rounded-2xl p-4 shadow-sm mb-4 flex justify-end items-center">' +
+          '<button onclick="forceNextSet()" class="bg-indigo-700 hover:bg-indigo-600 text-xs px-4 py-2.5 rounded-xl border border-indigo-500 font-bold transition">手動で更新</button>' +
         '</div>' +
         '<div class="grid grid-cols-2 gap-2 p-1 bg-slate-200/60 rounded-xl mb-4">' +
           '<button onclick="switchMainTab(\'grammar\')" class="py-2.5 rounded-lg text-sm font-bold transition ' + (state.mainTab === 'grammar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600') + '">文法</button>' +
