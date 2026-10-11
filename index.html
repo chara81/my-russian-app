@@ -96,6 +96,15 @@
       return `${year}-${month}-${day}`;
     }
 
+    // ローカルストレージからの安全な取得
+    function loadHistoryLogs() {
+      try {
+        return JSON.parse(localStorage.getItem('ru_app_history_logs') || '{}');
+      } catch (e) {
+        return {};
+      }
+    }
+
     // --- アプリの状態 (State) ---
     let state = {
       isAuthenticated: false,
@@ -111,7 +120,7 @@
       manualOffset: parseInt(localStorage.getItem('ru_app_manual_offset') || '0', 10),
 
       // 実施記録保存データ
-      historyLogs: JSON.parse(localStorage.getItem('ru_app_history_logs') || '{}'),
+      historyLogs: loadHistoryLogs(),
 
       // 文法状態
       grammarSubTab: 'morning',
@@ -194,6 +203,7 @@
     // --- メインレンダリング ---
     function render() {
       const app = document.getElementById('app');
+      if (!app) return;
 
       if (!state.isAuthenticated) {
         app.innerHTML = `
@@ -210,7 +220,7 @@
             </form>
           </div>
         `;
-        lucide.createIcons();
+        if (window.lucide) lucide.createIcons();
         return;
       }
 
@@ -274,7 +284,7 @@
           </div>
         </div>
       `;
-      lucide.createIcons();
+      if (window.lucide) lucide.createIcons();
     }
 
     // --- 文法セクション ---
@@ -386,17 +396,4 @@
         state.isAuthenticated = true;
         state.authError = false;
         state.passwordInput = '';
-      } else {
-        state.authError = true;
-      }
-      render();
-    }
-
-    function handleLogout() {
-      state.isAuthenticated = false;
-      render();
-    }
-
-    function switchMainTab(tab) {
-      state.mainTab = tab;
-    
+      } else 
