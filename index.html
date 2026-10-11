@@ -87,7 +87,7 @@
       { ru: "мясо", reading: "ミャーサ", jp: "肉" }
     ];
 
-    // 現在の正確な日付文字列 (YYYY-MM-DD) を取得
+    // 現在の日付を取得 (YYYY-MM-DD)
     function getTodayStr() {
       const now = new Date();
       const year = now.getFullYear();
@@ -110,7 +110,7 @@
       // 手動更新オフセット
       manualOffset: parseInt(localStorage.getItem('ru_app_manual_offset') || '0', 10),
 
-      // 実施記録保存データ { "2026-10-11": true }
+      // 実施記録保存データ
       historyLogs: JSON.parse(localStorage.getItem('ru_app_history_logs') || '{}'),
 
       // 文法状態
@@ -398,4 +398,5 @@
     }
 
     function switchMainTab(tab) {
-      st
+      state.mainTab = tab;
+      rende
