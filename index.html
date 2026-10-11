@@ -85,6 +85,7 @@
       { ru: "мясо", reading: "ミャーサ", jp: "肉" }
     ];
 
+    // 本日の正しい日付文字列 (YYYY-MM-DD) を取得
     function getTodayStr() {
       const now = new Date();
       const y = now.getFullYear();
@@ -93,7 +94,7 @@
       return y + "-" + m + "-" + d;
     }
 
-    // 日付文字列に日数を加算するユーティリティ
+    // 日付文字列に日数を加算する
     function addDaysToStr(dateStr, days) {
       const parts = dateStr.split('-').map(Number);
       const d = new Date(parts[0], parts[1] - 1, parts[2]);
@@ -110,7 +111,7 @@
       authError: false,
       mainTab: 'grammar',
       manualOffset: parseInt(localStorage.getItem('ru_app_manual_offset') || '0', 10),
-      selectedRecordDate: null,
+      selectedRecordDate: getTodayStr(), // 初期値を常に今日に固定
       historyLogs: JSON.parse(localStorage.getItem('ru_app_history_logs') || '{}'),
       grammarSubTab: 'morning',
       grammarCardIdx: 0,
@@ -134,13 +135,6 @@
       return cycle + state.manualOffset;
     }
 
-    // 現在のセットに該当する実質的な表示用日付を取得
-    function getEffectiveDateStr() {
-      if (state.selectedRecordDate) return state.selectedRecordDate;
-      const todayStr = getTodayStr();
-      return addDaysToStr(todayStr, state.manualOffset * 2);
-    }
-
     function getCurrentData() {
       const setIdx = getCurrentSetIndex();
       const sentences = [];
@@ -152,11 +146,11 @@
       return { sentences, words, setIdx };
     }
 
-    // 手動更新時にオフセットを加算し、記録用の選択日付もその分連動させる
+    // 手動更新時に問題セットを進め、記録日付も1日加算
     function forceNextSet() {
       state.manualOffset += 1;
       localStorage.setItem('ru_app_manual_offset', state.manualOffset.toString());
-      state.selectedRecordDate = addDaysToStr(getEffectiveDateStr(), 2);
+      state.selectedRecordDate = addDaysToStr(state.selectedRecordDate, 1);
       resetLearningState();
       render();
     }
@@ -202,7 +196,7 @@
       }
 
       const currentData = getCurrentData();
-      const recDate = getEffectiveDateStr();
+      const recDate = state.selectedRecordDate;
       const isCompleted = !!state.historyLogs[recDate];
 
       let contentHtml = '';
