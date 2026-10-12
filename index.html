@@ -13,7 +13,6 @@
   <div id="app" class="max-w-xl mx-auto"></div>
 
   <script>
-    // 自動キャッシュ対策（毎回最新版を読み込む）
     if (!window.location.search.includes('v=')) {
       const t = new Date().getTime();
       window.location.replace(window.location.protocol + "//" + window.location.host + window.location.pathname + '?v=' + t);
@@ -22,30 +21,373 @@
     const SECRET_PASSWORD = "5028";
     const BASE_DATE_STR = "2026-10-09";
 
+    // --- 文法プール（150文＝30セット分） ---
     const SENTENCES_POOL = [
+      // Set 1
       { ru: "Я читаю книгу.", jp: "私は本を読んでいます。" },
       { ru: "Он пишет письма.", jp: "彼は手紙を書いています。" },
       { ru: "Она изучает русский язык.", jp: "彼女はロシア語を勉強しています。" },
       { ru: "Мы живем в Токио.", jp: "私たちは東京に住んでいます。" },
       { ru: "Вы понимаете по-русски?", jp: "あなたはロシア語が分かりますか？" },
+      // Set 2
       { ru: "Они смотрят новый фильм.", jp: "彼らは新しい映画を見ています。" },
       { ru: "Я люблю слушать музыку.", jp: "私は音楽を聴くのが好きです。" },
       { ru: "Брат работает в банке.", jp: "兄は銀行で働いています。" },
       { ru: "Сестра пьет горячий чай.", jp: "姉は温かいお茶を飲んでいます。" },
-      { ru: "Мой друг хорошо говорит.", jp: "私の友達は上手に話します。" }
+      { ru: "Мой друг хорошо говорит.", jp: "私の友達は上手に話します。" },
+      // Set 3
+      { ru: "Я хочу купить хлеб.", jp: "私はパンを買いたいです。" },
+      { ru: "Где находится станция?", jp: "駅はどこにありますか？" },
+      { ru: "Сегодня хорошая погода.", jp: "今日は良い天気です。" },
+      { ru: "Мы завтракаем утром.", jp: "私たちは朝に朝食を食べます。" },
+      { ru: "Он хорошо знает этот город.", jp: "彼はこの街をよく知っています。" },
+      // Set 4
+      { ru: "Она пьет кофе без сахара.", jp: "彼女は砂糖なしのコーヒーを飲みます。" },
+      { ru: "Вы были в Москве?", jp: "あなたはモスクワに行ったことがありますか？" },
+      { ru: "Дети играют в парке.", jp: "子供たちが公園で遊んでいます。" },
+      { ru: "Я знаю ответ на вопрос.", jp: "私は質問の答えを知っています。" },
+      { ru: "Мама готовит вкусный суп.", jp: "お母さんが美味しいスープを作っています。" },
+      // Set 5
+      { ru: "У меня есть собака.", jp: "私には犬がいます。" },
+      { ru: "Этот магазин открыт.", jp: "この店は開いています。" },
+      { ru: "Мы слушаем радио.", jp: "私たちはラジオを聞いています。" },
+      { ru: "Она идет в школу.", jp: "彼女は学校に行きます。" },
+      { ru: "Сколько это стоит?", jp: "これはいくらですか？" },
+      // Set 6
+      { ru: "Я изучаю историю.", jp: "私は歴史を学んでいます。" },
+      { ru: "Он ждет автобус.", jp: "彼はバスを待っています。" },
+      { ru: "Завтра будет солнце.", jp: "明日は晴れるでしょう。" },
+      { ru: "Мы любим путешествовать.", jp: "私たちは旅行をするのが好きです。" },
+      { ru: "Спасибо за помощь.", jp: "助けてくれてありがとう。" },
+      // Set 7
+      { ru: "Я часто хожу в библиотеку.", jp: "私はよく図書館に行きます。" },
+      { ru: "Она отлично готовит.", jp: "彼女は料理がとても上手です。" },
+      { ru: "Он читает свежую газету.", jp: "彼は新しい新聞を読んでいます。" },
+      { ru: "Мы покупаем овощи.", jp: "私たちは野菜を買っています。" },
+      { ru: "Вы часто смотритеテレビ?", jp: "あなたはよくテレビを見ますか？" },
+      // Set 8
+      { ru: "Я знаю этого человека.", jp: "私はこの人を知っています。" },
+      { ru: "Анна хорошо поет.", jp: "アンナは歌が上手です。" },
+      { ru: "Папа чинит машину.", jp: "お父さんが車を修理しています。" },
+      { ru: "Мы гуляем в саду.", jp: "私たちは庭を散歩しています。" },
+      { ru: "Они обедают в ресторане.", jp: "彼らはレストランで昼食をとっています。" },
+      // Set 9
+      { ru: "Я заказываю пиццу.", jp: "私はピザを注文しています。" },
+      { ru: "Ты понимаешь هذا文?", jp: "君はこの文章が分かりますか？" },
+      { ru: "Она очень красиво танцует.", jp: "彼女はとても綺麗に踊ります。" },
+      { ru: "Мы ждем гостей.", jp: "私たちは客を待っています。" },
+      { ru: "Ученики слушают учителя.", jp: "生徒たちは先生の話を聞いています。" },
+      // Set 10
+      { ru: "Я забыл свои ключи.", jp: "私は鍵を忘れました。" },
+      { ru: "Она закрывает окно.", jp: "彼女は窓を閉めています。" },
+      { ru: "Он открывает дверь.", jp: "彼はドアを開けています。" },
+      { ru: "Мы ужинаем дома.", jp: "私たちは家で夕食を食べます。" },
+      { ru: "Вы любите спорт?", jp: "あなたはスポーツが好きですか？" },
+      // Set 11
+      { ru: "Я отправляю письмо.", jp: "私は手紙を送ります。" },
+      { ru: "Она учит новые слова.", jp: "彼女は新しい単語を覚えています。" },
+      { ru: "Он играет на гитаре.", jp: "彼はギターを弾きます。" },
+      { ru: "Мы смотрим на карту.", jp: "私たちは地図を見ています。" },
+      { ru: "Они едут на поезд.", jp: "彼らは電車に乗っています。" },
+      // Set 12
+      { ru: "Я пью холодную воду.", jp: "私は冷たい水を飲んでいます。" },
+      { ru: "Она берет сумку.", jp: "彼女はバッグを持っていきます。" },
+      { ru: "Он дает мне книгу.", jp: "彼は私に本をくれます。" },
+      { ru: "Мы идем в театр.", jp: "私たちは劇場に行きます。" },
+      { ru: "Вы знаете этот адрес?", jp: "あなたはこの住所を知っていますか？" },
+      // Set 13
+      { ru: "Я часто звоню маме.", jp: "私はよく母に電話します。" },
+      { ru: "Она рисует картину.", jp: "彼女は絵を描いています。" },
+      { ru: "Он ищет ключи.", jp: "彼は鍵を探しています。" },
+      { ru: "Мы отдыхаем на море.", jp: "私たちは海で休んでいます。" },
+      { ru: "Они строят дом.", jp: "彼らは家を建てています。" },
+      // Set 14
+      { ru: "Я знаю этот номер.", jp: "私はこの番号を知っています。" },
+      { ru: "Она держит цветы.", jp: "彼女は花を持っています。" },
+      { ru: "Он рассказывает историю.", jp: "彼は話をしています。" },
+      { ru: "Мы покупаем билеты.", jp: "私たちはチケットを買います。" },
+      { ru: "Вы любите кофе?", jp: "あなたはコーヒーが好きですか？" },
+      // Set 15
+      { ru: "Я хочу пить水.", jp: "私は水が飲みたいです。" },
+      { ru: "Она изучает физику.", jp: "彼女は物理学を学んでいます。" },
+      { ru: "Он играет в футбол.", jp: "彼はサッカーをしています。" },
+      { ru: "Мы встречаем друга.", jp: "私たちは友達を出迎えます。" },
+      { ru: "Они живут близко.", jp: "彼らは近くに住んでいます。" },
+      // Set 16
+      { ru: "Я вижу синее море.", jp: "私には青い海が見えます。" },
+      { ru: "Она несет яблоки.", jp: "彼女はりんごを運んでいます。" },
+      { ru: "Он спрашивает дорогу.", jp: "彼は道を尋ねています。" },
+      { ru: "Мы ответили правильно.", jp: "私たちは正しく答えました。" },
+      { ru: "Вы знаете эти правила?", jp: "あなたはこのルールを知っていますか？" },
+      // Set 17
+      { ru: "Я читаю длинную статью.", jp: "私は長い記事を読んでいます。" },
+      { ru: "Она надевает пальто.", jp: "彼女はコートを着ています。" },
+      { ru: "Он снимает куртку.", jp: "彼は上着を脱いでいます。" },
+      { ru: "Мы слушаем лекцию.", jp: "私たちは講義を聴いています。" },
+      { ru: "Они ждут самолет.", jp: "彼らは飛行機を待っています。" },
+      // Set 18
+      { ru: "Я хочу спать.", jp: "私は寝たいです。" },
+      { ru: "Она гуляет с собакой.", jp: "彼女は犬と散歩しています。" },
+      { ru: "Он чистит зубы.", jp: "彼は歯を磨いています。" },
+      { ru: "Мы готовим обед.", jp: "私たちは昼食を作っています。" },
+      { ru: "Вы уже готовы?", jp: "あなたはもう準備ができましたか？" },
+      // Set 19
+      { ru: "Я пью зеленый чай.", jp: "私は緑茶を飲んでいます。" },
+      { ru: "Она несет тяжелый портфель.", jp: "彼女は重い鞄を持っています。" },
+      { ru: "Он умеет плавать.", jp: "彼は泳ぐことができます。" },
+      { ru: "Мы идем на концерт.", jp: "私たちはコンサートに行きます。" },
+      { ru: "Они слушают музыку.", jp: "彼らは音楽を聴いています。" },
+      // Set 20
+      { ru: "Я помню этот день.", jp: "私はこの日を覚えています。" },
+      { ru: "Она заходит в комнатy.", jp: "彼女は部屋に入ってきます。" },
+      { ru: "Он выходит из дома.", jp: "彼は家から出ていきます。" },
+      { ru: "Мы едем в центр.", jp: "私たちは中心部へ行きます。" },
+      { ru: "Вы часто путешествуете?", jp: "あなたはよく旅行をしますか？" },
+      // Set 21
+      { ru: "Я открываю окно.", jp: "私は窓を開けます。" },
+      { ru: "Она закрывает дверь.", jp: "彼女はドアを閉めます。" },
+      { ru: "Он ищет свою работу.", jp: "彼は自分の仕事を探しています。" },
+      { ru: "Мы обсуждаем план.", jp: "私たちは計画を話し合っています。" },
+      { ru: "Они согласны с нами.", jp: "彼らは私たちと同意見です。" },
+      // Set 22
+      { ru: "Я люблю читать стихи.", jp: "私は詩を読むのが好きです。" },
+      { ru: "Она красиво рисует.", jp: "彼女は絵を上手に描きます。" },
+      { ru: "Он строит новый гараж.", jp: "彼は新しいガレージを建てています。" },
+      { ru: "Мы ждем лета.", jp: "私たちは夏を待っています。" },
+      { ru: "Вы были там раньше?", jp: "あなたは以前そこに行ったことがありますか？" },
+      // Set 23
+      { ru: "Я покупаю свежий хлеб.", jp: "私は焼きたてのパンを買います。" },
+      { ru: "Она пьет молоко.", jp: "彼女は牛乳を飲んでいます。" },
+      { ru: "Он знает рецепт.", jp: "彼はレシピを知っています。" },
+      { ru: "Мы готовим ужин.", jp: "私たちは夕食を作っています。" },
+      { ru: "Они едят фрукты.", jp: "彼らは果物を食べています。" },
+      // Set 24
+      { ru: "Я слышу красивую песню.", jp: "私は美しい歌が聞こえます。" },
+      { ru: "Она учит математику.", jp: "彼女は数学を勉強しています。" },
+      { ru: "Он решает задачу.", jp: "彼は問題を解いています。" },
+      { ru: "Мы идем в музей.", jp: "私たちは博物館に行きます。" },
+      { ru: "Вы знаете этот музей?", jp: "あなたはこの博物館を知っていますか？" },
+      { ru: "Я жду друга на улице.", jp: "私は通りで友達を待っています。" },
+      // Set 25
+      { ru: "Она звонит врачу.", jp: "彼女は医者に電話をかけています。" },
+      { ru: "Он берет зонт.", jp: "彼は傘を持っていきます。" },
+      { ru: "Мы идем пешком.", jp: "私たちは歩いて行きます。" },
+      { ru: "Они едут на машине.", jp: "彼らは車で行きます。" },
+      { ru: "Я понимаю этот факт.", jp: "私はこの事実を理解しています。" },
+      // Set 26
+      { ru: "Она любит природу.", jp: "彼女は自然が好きです。" },
+      { ru: "Он пишет статью.", jp: "彼は記事を書いています。" },
+      { ru: "Мы покупаем сыр.", jp: "私たちはチーズを買っています。" },
+      { ru: "Вы хотите чай?", jp: "お茶はいかがですか？" },
+      { ru: "Я вижу красивый сад.", jp: "私には綺麗な庭が見えます。" },
+      // Set 27
+      { ru: "Она смотрит в окно.", jp: "彼女は窓の外を見ています。" },
+      { ru: "Он читает интересную книгу.", jp: "彼は面白い本を読んでいます。" },
+      { ru: "Мы ждем поезд.", jp: "私たちは電車を待っています。" },
+      { ru: "Они идут в кино.", jp: "彼らは映画館に行きます。" },
+      { ru: "Я готовлю кофе.", jp: "私はコーヒーを淹れています。" },
+      // Set 28
+      { ru: "Она надевает платье.", jp: "彼女はドレスを着ています。" },
+      { ru: "Он ищет очки.", jp: "彼はメガネを探しています。" },
+      { ru: "Мы слушаем радио.", jp: "私たちはラジオを聞いています。" },
+      { ru: "Вы знаете русский язык?", jp: "あなたはロシア語を知っていますか？" },
+      { ru: "Я знаю этого врача.", jp: "私はこの医師を知っています。" },
+      // Set 29
+      { ru: "Она занимается спортом.", jp: "彼女はスポーツをしています。" },
+      { ru: "Он работает дома.", jp: "彼は在宅で働いています。" },
+      { ru: "Мы любим нашу代.", jp: "私たちは自分たちの街を愛しています。" },
+      { ru: "Они едут в出張.", jp: "彼らは出張に行きます。" },
+      { ru: "Я покупаю сок.", jp: "私はジュースを買っています。" },
+      // Set 30
+      { ru: "Она читает журнал.", jp: "彼女は雑誌を読んでいます。" },
+      { ru: "Он смотрит новости.", jp: "彼はニュースを見ています。" },
+      { ru: "Мы ждем весну.", jp: "私たちは春を待っています。" },
+      { ru: "Вы любите зиму?", jp: "あなたは冬が好きですか？" },
+      { ru: "У нас все хорошо.", jp: "私たちはすべて順調です。" }
     ];
 
+    // --- 単語プール（150語＝30セット分） ---
     const WORDS_POOL = [
+      // Set 1
       { ru: "книга", reading: "クニーガ", jp: "本" },
       { ru: "письмо", reading: "ピシモー", jp: "手紙" },
       { ru: "город", reading: "ゴーロト", jp: "街・都市" },
       { ru: "друг", reading: "ドルーグ", jp: "友達" },
       { ru: "время", reading: "ヴレーミャ", jp: "時間" },
+      // Set 2
       { ru: "работа", reading: "ラボータイ", jp: "仕事" },
       { ru: "слово", reading: "スローヴォ", jp: "言葉・単語" },
       { ru: "семья", reading: "セミヤー", jp: "家族" },
       { ru: "утро", reading: "ウートロ", jp: "朝" },
-      { ru: "вечер", reading: "ヴェーチェル", jp: "夜・晩" }
+      { ru: "вечер", reading: "ヴェーチェル", jp: "夜・晩" },
+      // Set 3
+      { ru: "вода", reading: "ヴァダー", jp: "水" },
+      { ru: "хлеб", reading: "フレープ", jp: "パン" },
+      { ru: "чай", reading: "チャイ", jp: "お茶" },
+      { ru: "дом", reading: "ドム", jp: "家・建物" },
+      { ru: "улица", reading: "ウーリツァ", jp: "通り・道" },
+      // Set 4
+      { ru: "машина", reading: "マシーナ", jp: "車" },
+      { ru: "деньги", reading: "ジエンギ", jp: "お金" },
+      { ru: "человек", reading: "チェロヴェーク", jp: "人・人間" },
+      { ru: "магазин", reading: "マガズィン", jp: "店・ショップ" },
+      { ru: "погода", reading: "パゴーダ", jp: "天気" },
+      // Set 5
+      { ru: "дверь", reading: "ドヴェーリ", jp: "ドア・扉" },
+      { ru: "окно", reading: "アクノー", jp: "窓" },
+      { ru: "стол", reading: "ストール", jp: "机・テーブル" },
+      { ru: "стул", reading: "ストゥール", jp: "椅子" },
+      { ru: "ручка", reading: "ルーチカ", jp: "ペン" },
+      // Set 6
+      { ru: "тетрадь", reading: "チトラージ", jp: "ノート" },
+      { ru: "яблоко", reading: "ヤーブラコ", jp: "りんご" },
+      { ru: "молоко", reading: "マラコー", jp: "牛乳" },
+      { ru: "рыба", reading: "ルィーバ", jp: "魚" },
+      { ru: "мясо", reading: "ミャーサ", jp: "肉" },
+      // Set 7
+      { ru: "сыр", reading: "スィール", jp: "チーズ" },
+      { ru: "сок", reading: "ソーク", jp: "ジュース" },
+      { ru: "кофе", reading: "コーフェ", jp: "コーヒー" },
+      { ru: "сахар", reading: "サーハル", jp: "砂糖" },
+      { ru: "соль", reading: "ソコリ", jp: "塩" },
+      // Set 8
+      { ru: "суп", reading: "スープ", jp: "スープ" },
+      { ru: "масло", reading: "マースロ", jp: "バター・油" },
+      { ru: "овощи", reading: "オーヴォシ", jp: "野菜" },
+      { ru: "фрукты", reading: "フルークトィ", jp: "果物" },
+      { ru: "поезд", reading: "ポーエズト", jp: "電車・列車" },
+      // Set 9
+      { ru: "автобус", reading: "アフノーブス", jp: "バス" },
+      { ru: "самолет", reading: "サマリョート", jp: "飛行機" },
+      { ru: "станция", reading: "スタンツィヤ", jp: "駅" },
+      { ru: "аптека", reading: "アプテーカ", jp: "薬局" },
+      { ru: "больница", reading: "バリニーツァ", jp: "病院" },
+      // Set 10
+      { ru: "школа", reading: "シコーラ", jp: "学校" },
+      { ru: "музей", reading: "ムゼイ", jp: "博物館・美術館" },
+      { ru: "парк", reading: "パーク", jp: "公園" },
+      { ru: "сад", reading: "サート", jp: "庭" },
+      { ru: "море", reading: "モーレ", jp: "海" },
+      // Set 11
+      { ru: "река", reading: "レカー", jp: "川" },
+      { ru: "гора", reading: "ガラ", jp: "山" },
+      { ru: "солнце", reading: "ソールンツェ", jp: "太陽" },
+      { ru: "дождь", reading: "ドージジ", jp: "雨" },
+      { ru: "снег", reading: "スネーク", jp: "雪" },
+      // Set 12
+      { ru: "зима", reading: "ズィマー", jp: "冬" },
+      { ru: "весна", reading: "ヴェスナー", jp: "春" },
+      { ru: "лето", reading: "レータ", jp: "夏" },
+      { ru: "осень", reading: "オーセニ", jp: "秋" },
+      { ru: "день", reading: "ジェニ", jp: "日・昼" },
+      // Set 13
+      { ru: "ночь", reading: "ノーチ", jp: "夜" },
+      { ru: "минута", reading: "ミヌータ", jp: "分" },
+      { ru: "час", reading: "チャース", jp: "時間" },
+      { ru: "год", reading: "ゴート", jp: "年" },
+      { ru: "месяц", reading: "メーシャツ", jp: "月" },
+      // Set 14
+      { ru: "собака", reading: "サバーカ", jp: "犬" },
+      { ru: "кошка", reading: "コーシュカ", jp: "猫" },
+      { ru: "птица", reading: "プティーツァ", jp: "鳥" },
+      { ru: "дерево", reading: "ジェーレヴォ", jp: "木" },
+      { ru: "цветок", reading: "ツヴェトーク", jp: "花" },
+      // Set 15
+      { ru: "папа", reading: "パーパ", jp: "お父さん" },
+      { ru: "мама", reading: "マーマ", jp: "お母さん" },
+      { ru: "брат", reading: "ブラート", jp: "兄弟・兄・弟" },
+      { ru: "сестра", reading: "シストラ", jp: "姉妹・姉・妹" },
+      { ru: "сын", reading: "スィン", jp: "息子" },
+      // Set 16
+      { ru: "дочь", reading: "ドーチ", jp: "娘" },
+      { ru: "врач", reading: "ヴラーチ", jp: "医師" },
+      { ru: "учитель", reading: "ウチーテリ", jp: "先生・教師" },
+      { ru: "студент", reading: "ストゥデント", jp: "学生" },
+      { ru: "гость", reading: "ゴースチ", jp: "客・ゲスト" },
+      // Set 17
+      { ru: "рука", reading: "ルカー", jp: "手・腕" },
+      { ru: "нога", reading: "ナガー", jp: "足" },
+      { ru: "голова", reading: "ガラヴァー", jp: "頭" },
+      { ru: "глаз", reading: "グラース", jp: "目" },
+      { ru: "ухо", reading: "ウーホ", jp: "耳" },
+      // Set 18
+      { ru: "рот", reading: "ロート", jp: "口" },
+      { ru: "нос", reading: "ノース", jp: "鼻" },
+      { ru: "зуб", reading: "ズープ", jp: "歯" },
+      { ru: "сердце", reading: "セールツェ", jp: "心臓・心" },
+      { ru: "одежда", reading: "アデージダ", jp: "服・衣類" },
+      // Set 19
+      { ru: "пальто", reading: "パルトー", jp: "コート" },
+      { ru: "куртка", reading: "クールトカ", jp: "ジャケット・上着" },
+      { ru: "платье", reading: "プラーチエ", jp: "ドレス・ワンピース" },
+      { ru: "брюки", reading: "ブリューキ", jp: "ズボン" },
+      { ru: "обувь", reading: "オーブフィ", jp: "靴・履物" },
+      // Set 20
+      { ru: "сумка", reading: "スームカ", jp: "バッグ・鞄" },
+      { ru: "ключ", reading: "クリューチ", jp: "鍵" },
+      { ru: "зонт", reading: "ゾーント", jp: "傘" },
+      { ru: "очки", reading: "アチキー", jp: "メガネ" },
+      { ru: "часы", reading: "チャスィー", jp: "時計" },
+      // Set 21
+      { ru: "карта", reading: "カルタ", jp: "地図・カード" },
+      { ru: "билет", reading: "ビレート", jp: "チケット・切符" },
+      { ru: "номер", reading: "ノーメル", jp: "番号・部屋" },
+      { ru: "адрес", reading: "アドレス", jp: "住所" },
+      { ru: "телефон", reading: "テレフォン", jp: "電話" },
+      // Set 22
+      { ru: "музыка", reading: "ムー劇カ", jp: "音楽" },
+      { ru: "песня", reading: "ピエスニャ", jp: "歌" },
+      { ru: "фильм", reading: "フィルム", jp: "映画" },
+      { ru: "театр", reading: "テアートゥル", jp: "劇場" },
+      { ru: "газета", reading: "ガゼータ", jp: "新聞" },
+      // Set 23
+      { ru: "журнал", reading: "ジュルナール", jp: "雑誌" },
+      { ru: "картина", reading: "カルチーナ", jp: "絵画・写真" },
+      { ru: "сказка", reading: "スカースカ", jp: "童話・民話" },
+      { ru: "история", reading: "イストーリヤ", jp: "歴史・物語" },
+      { ru: "вопрос", reading: "ヴァプロース", jp: "質問" },
+      // Set 24
+      { ru: "ответ", reading: "アトヴェート", jp: "答え" },
+      { ru: "задача", reading: "ザダーチャ", jp: "課題・問題" },
+      { ru: "правило", reading: "プラーヴィロ", jp: "ルール・規則" },
+      { ru: "план", reading: "プラーン", jp: "計画・プラン" },
+      { ru: "спорт", reading: "スポールト", jp: "スポーツ" },
+      // Set 25
+      { ru: "футбол", reading: "フトボール", jp: "サッカー" },
+      { ru: "гитара", reading: "ギターラ", jp: "ギター" },
+      { ru: "море", reading: "モーレ", jp: "海" },
+      { ru: "небо", reading: "ネーバ", jp: "空" },
+      { ru: "воздух", reading: "ヴォーズドゥフ", jp: "空気" },
+      // Set 26
+      { ru: "ветер", reading: "ヴェーテル", jp: "風" },
+      { ru: "огонь", reading: "アゴーニ", jp: "火" },
+      { ru: "земля", reading: "ズィムリャー", jp: "地球・土地" },
+      { ru: "камень", reading: "カーメニ", jp: "石" },
+      { ru: "лекарство", reading: "レカールストヴォ", jp: "薬" },
+      // Set 27
+      { ru: "подарок", reading: "パダーロク", jp: "プレゼント・贈り物" },
+      { ru: "праздник", reading: "プラーズニク", jp: "祝日・祭り" },
+      { ru: "успех", reading: "ウスペーフ", jp: "成功" },
+      { ru: "ошибка", reading: "アシープカ", jp: "間違い・ミス" },
+      { ru: "правда", reading: "プラーヴダ", jp: "真実・本当" },
+      // Set 28
+      { ru: "жизнь", reading: "ジーズニ", jp: "人生・生活" },
+      { ru: "мир", reading: "ミール", jp: "世界・平和" },
+      { ru: "свет", reading: "スヴェート", jp: "光" },
+      { ru: "звук", reading: "ズヴーク", jp: "音" },
+      { ru: "вкус", reading: "フコース", jp: "味" },
+      // Set 29
+      { ru: "запах", reading: "ザーパフ", jp: "匂い・香り" },
+      { ru: "сила", reading: "シーラ", jp: "力" },
+      { ru: "ум", reading: "ウーム", jp: "知恵・知性" },
+      { ru: "душа", reading: "ドゥシャー", jp: "魂・心" },
+      { ru: "радость", reading: "ラードスチ", jp: "喜び" },
+      // Set 30
+      { ru: "счастье", reading: "スチャースチエ", jp: "幸せ" },
+      { ru: "любовь", reading: "リュボーフィ", jp: "愛" },
+      { ru: "миг", reading: "ミーグ", jp: "瞬間" },
+      { ru: "цель", reading: "ツェーリ", jp: "目的・ゴール" },
+      { ru: "мечта", reading: "メチター", jp: "夢" }
     ];
 
     function getTodayStr() {
@@ -99,287 +441,3 @@
 
     function render() {
       const app = document.getElementById('app');
-      if (!app) return;
-      app.innerHTML = '';
-
-      // ログイン画面
-      if (!state.isAuthenticated) {
-        const loginCard = document.createElement('div');
-        loginCard.className = "bg-white rounded-2xl shadow-xl p-8 mt-12 text-center border border-slate-100";
-        
-        const h2 = document.createElement('h2');
-        h2.className = "text-2xl font-bold mb-2";
-        h2.textContent = "ロシア語学習";
-        
-        const p = document.createElement('p');
-        p.className = "text-sm text-slate-500 mb-6";
-        p.textContent = "パスワードを入力してください";
-        
-        const form = document.createElement('form');
-        form.onsubmit = function(e) {
-          e.preventDefault();
-          if (state.passwordInput === SECRET_PASSWORD) {
-            state.isAuthenticated = true;
-            state.authError = false;
-          } else {
-            state.authError = true;
-          }
-          render();
-        };
-
-        const input = document.createElement('input');
-        input.type = "password";
-        input.placeholder = "パスワード";
-        input.className = "w-full text-center px-4 py-3 rounded-xl border border-slate-300 mb-4 focus:outline-none";
-        input.oninput = function(e) { state.passwordInput = e.target.value; };
-
-        const btn = document.createElement('button');
-        btn.type = "submit";
-        btn.className = "w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow";
-        btn.textContent = "ログイン";
-
-        form.appendChild(input);
-        if (state.authError) {
-          const err = document.createElement('p');
-          err.className = "text-xs text-red-500 mb-2";
-          err.textContent = "パスワードが違います";
-          form.appendChild(err);
-        }
-        form.appendChild(btn);
-
-        loginCard.appendChild(h2);
-        loginCard.appendChild(p);
-        loginCard.appendChild(form);
-        app.appendChild(loginCard);
-        return;
-      }
-
-      // 学習アプリ本体
-      const recDate = state.selectedRecordDate;
-      const todayStr = getTodayStr();
-      const setIdx = getSetIdx(recDate);
-      const isDone = !!state.historyLogs[recDate];
-
-      // 1. ヘッダー
-      const header = document.createElement('div');
-      header.className = "bg-white rounded-2xl p-4 shadow-sm border mb-4 flex justify-between items-center";
-      header.innerHTML = '<span class="font-bold text-lg">ロシア語 日課学習</span>';
-      const lockBtn = document.createElement('button');
-      lockBtn.className = "text-xs text-slate-400";
-      lockBtn.textContent = "ロック";
-      lockBtn.onclick = function() { state.isAuthenticated = false; render(); };
-      header.appendChild(lockBtn);
-      app.appendChild(header);
-
-      // 2. 日付・更新バー
-      const bar = document.createElement('div');
-      bar.className = "bg-indigo-900 text-white rounded-2xl p-4 mb-4 flex justify-between items-center";
-      bar.innerHTML = '<div class="text-xs">表示中の学習日: <strong class="text-sm">' + recDate + '</strong></div>';
-      const nextBtn = document.createElement('button');
-      nextBtn.className = "bg-indigo-700 hover:bg-indigo-600 text-xs px-3 py-2 rounded-xl font-bold border border-indigo-500";
-      nextBtn.textContent = "手動で更新";
-      nextBtn.onclick = function() {
-        state.manualOffset += 1;
-        localStorage.setItem('ru_app_manual_offset', state.manualOffset.toString());
-        state.selectedRecordDate = addDaysToStr(state.selectedRecordDate, 1);
-        render();
-      };
-      bar.appendChild(nextBtn);
-      app.appendChild(bar);
-
-      // 3. タブ
-      const tabs = document.createElement('div');
-      tabs.className = "grid grid-cols-2 gap-2 p-1 bg-slate-200 rounded-xl mb-4";
-      
-      const gTab = document.createElement('button');
-      gTab.className = "py-2 rounded-lg font-bold text-sm " + (state.mainTab === 'grammar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600');
-      gTab.textContent = "文法";
-      gTab.onclick = function() { state.mainTab = 'grammar'; render(); };
-      
-      const vTab = document.createElement('button');
-      vTab.className = "py-2 rounded-lg font-bold text-sm " + (state.mainTab === 'vocab' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600');
-      vTab.textContent = "単語";
-      vTab.onclick = function() { state.mainTab = 'vocab'; render(); };
-
-      tabs.appendChild(gTab);
-      tabs.appendChild(vTab);
-      app.appendChild(tabs);
-
-      // 4. 問題表示カード
-      const card = document.createElement('div');
-      card.className = "bg-white rounded-2xl p-5 shadow-sm border mb-6";
-
-      if (state.mainTab === 'grammar') {
-        const cur = SENTENCES_POOL[(setIdx * 5 + state.grammarCardIdx) % SENTENCES_POOL.length];
-        
-        const qNum = document.createElement('div');
-        qNum.className = "text-center text-xs font-bold text-indigo-600 mb-2";
-        qNum.textContent = "問題 " + (state.grammarCardIdx + 1) + " / 5";
-        card.appendChild(qNum);
-
-        const ruText = document.createElement('div');
-        ruText.className = "text-center text-xl font-bold mb-4";
-        ruText.textContent = cur.ru;
-        card.appendChild(ruText);
-
-        if (state.grammarRevealed) {
-          const jpText = document.createElement('div');
-          jpText.className = "bg-indigo-50 p-3 rounded-xl text-center text-indigo-900 font-medium mb-4 text-sm";
-          jpText.textContent = cur.jp;
-          card.appendChild(jpText);
-        } else {
-          const showBtn = document.createElement('button');
-          showBtn.className = "w-full bg-slate-100 py-2.5 rounded-xl text-xs font-bold text-slate-600 mb-4";
-          showBtn.textContent = "答えを確認する";
-          showBtn.onclick = function() { state.grammarRevealed = true; render(); };
-          card.appendChild(showBtn);
-        }
-
-        const navRow = document.createElement('div');
-        navRow.className = "flex justify-between space-x-2";
-
-        const pBtn = document.createElement('button');
-        pBtn.className = "px-4 py-2 bg-slate-100 rounded-lg text-xs font-bold text-slate-600";
-        pBtn.textContent = "前へ";
-        pBtn.disabled = (state.grammarCardIdx === 0);
-        if (state.grammarCardIdx === 0) pBtn.className += " opacity-30";
-        pBtn.onclick = function() {
-          state.grammarCardIdx = Math.max(0, state.grammarCardIdx - 1);
-          state.grammarRevealed = false;
-          render();
-        };
-
-        const nBtn = document.createElement('button');
-        nBtn.className = "px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold";
-        nBtn.textContent = "次へ";
-        nBtn.disabled = (state.grammarCardIdx === 4);
-        if (state.grammarCardIdx === 4) nBtn.className += " opacity-30";
-        nBtn.onclick = function() {
-          state.grammarCardIdx = Math.min(4, state.grammarCardIdx + 1);
-          state.grammarRevealed = false;
-          render();
-        };
-
-        navRow.appendChild(pBtn);
-        navRow.appendChild(nBtn);
-        card.appendChild(navRow);
-      } else {
-        for (let i = 0; i < 5; i++) {
-          const w = WORDS_POOL[(setIdx * 5 + i) % WORDS_POOL.length];
-          const row = document.createElement('div');
-          row.className = "p-3 bg-slate-50 rounded-xl mb-2 flex justify-between items-center text-sm";
-          row.innerHTML = '<div><strong class="text-slate-800">' + w.ru + '</strong><div class="text-[10px] text-indigo-600">' + w.reading + '</div></div><div class="font-bold text-slate-600">' + w.jp + '</div>';
-          card.appendChild(row);
-        }
-      }
-      app.appendChild(card);
-
-      // 5. 実施記録＆イラスト風月間カレンダー
-      const recCard = document.createElement('div');
-      recCard.className = "bg-white rounded-2xl p-4 shadow-sm border";
-
-      const recHead = document.createElement('div');
-      recHead.className = "flex justify-between items-center mb-3 bg-slate-50 p-3 rounded-xl border";
-      recHead.innerHTML = '<span class="text-xs font-bold text-slate-700">' + recDate + ' の記録</span>';
-
-      const doneBtn = document.createElement('button');
-      doneBtn.className = "px-3 py-1.5 rounded-lg text-xs font-bold border transition " + (isDone ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-slate-400 border-slate-200');
-      doneBtn.textContent = isDone ? '✓ 完了' : '○ 未完了';
-      doneBtn.onclick = function() {
-        state.historyLogs[recDate] = !state.historyLogs[recDate];
-        localStorage.setItem('ru_app_history_logs', JSON.stringify(state.historyLogs));
-        render();
-      };
-      recHead.appendChild(doneBtn);
-      recCard.appendChild(recHead);
-
-      // カレンダー表示部
-      const calTitleRow = document.createElement('div');
-      calTitleRow.className = "flex justify-between items-center mt-4 mb-2 pt-3 border-t border-slate-100";
-      
-      const parts = recDate.split('-').map(Number);
-      const year = parts[0];
-      const month = parts[1];
-      
-      const titleSpan = document.createElement('span');
-      titleSpan.className = "text-xs font-bold text-slate-600";
-      titleSpan.textContent = year + "年 " + month + "月（日付タップで復習）";
-      calTitleRow.appendChild(titleSpan);
-
-      if (recDate !== todayStr) {
-        const backBtn = document.createElement('button');
-        backBtn.className = "text-xs text-indigo-600 font-bold underline";
-        backBtn.textContent = "今日に戻る";
-        backBtn.onclick = function() {
-          state.selectedRecordDate = todayStr;
-          render();
-        };
-        calTitleRow.appendChild(backBtn);
-      }
-      recCard.appendChild(calTitleRow);
-
-      // 曜日ヘッダー
-      const weekGrid = document.createElement('div');
-      weekGrid.className = "grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-2";
-      weekGrid.innerHTML = '<div class="text-rose-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-indigo-500">土</div>';
-      recCard.appendChild(weekGrid);
-
-      // グリッドマス目
-      const firstDay = new Date(year, month - 1, 1).getDay();
-      const lastDate = new Date(year, month, 0).getDate();
-      const grid = document.createElement('div');
-      grid.className = "grid grid-cols-7 gap-1.5";
-
-      for (let i = 0; i < firstDay; i++) {
-        const blank = document.createElement('div');
-        blank.className = "h-9";
-        grid.appendChild(blank);
-      }
-
-      for (let d = 1; d <= lastDate; d++) {
-        const dStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-        const done = !!state.historyLogs[dStr];
-        const selected = (dStr === recDate);
-        const isToday = (dStr === todayStr);
-
-        let bg = 'bg-slate-100 text-slate-700';
-        if (done) bg = 'bg-emerald-50 text-emerald-800 border-2 border-emerald-400 font-bold';
-        if (selected) bg += ' ring-2 ring-indigo-600 shadow scale-105';
-
-        const dayBtn = document.createElement('button');
-        dayBtn.className = "h-9 rounded-xl flex flex-col items-center justify-center relative text-xs " + bg;
-        dayBtn.onclick = function() {
-          state.selectedRecordDate = dStr;
-          state.grammarCardIdx = 0;
-          state.grammarRevealed = false;
-          render();
-        };
-
-        const numSpan = document.createElement('span');
-        numSpan.textContent = d;
-        dayBtn.appendChild(numSpan);
-
-        if (done) {
-          const mark = document.createElement('span');
-          mark.className = "text-[9px] text-emerald-600 font-extrabold leading-none";
-          mark.textContent = "✓";
-          dayBtn.appendChild(mark);
-        }
-
-        if (isToday) {
-          const dot = document.createElement('span');
-          dot.className = "absolute top-1 right-1 w-1.5 h-1.5 bg-indigo-600 rounded-full";
-          dayBtn.appendChild(dot);
-        }
-
-        grid.appendChild(dayBtn);
-      }
-
-      recCard.appendChild(grid);
-      app.appendChild(recCard);
-    }
-
-    render();
-  </script>
-</body>
-  </html>
