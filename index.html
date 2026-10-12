@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>ロシア語日課学習</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -13,11 +16,6 @@
   <div id="app" class="max-w-xl mx-auto"></div>
 
   <script>
-    if (!window.location.search.includes('v=')) {
-      const t = new Date().getTime();
-      window.location.replace(window.location.protocol + "//" + window.location.host + window.location.pathname + '?v=' + t);
-    }
-
     const SECRET_PASSWORD = "5028";
     const BASE_DATE_STR = "2026-10-09";
 
@@ -441,3 +439,5 @@
 
     function render() {
       const app = document.getElementById('app');
+      if (!app) return;
+      app.innerHTML = ''
