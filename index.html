@@ -173,112 +173,6 @@
       state.vocabNightChecked = {};
     }
 
-    function buildMonthCalendarHtml() {
-      const current = state.selectedRecordDate.split('-').map(Number);
-      const year = current[0];
-      const month = current[1];
-      
-      const firstDay = new Date(year, month - 1, 1).getDay();
-      const lastDate = new Date(year, month, 0).getDate();
-      const todayStr = getTodayStr();
-
-      let daysGrid = '';
-
-      // 月初前の空白
-      for (let i = 0; i < firstDay; i++) {
-        daysGrid += '<div class="h-9"></div>';
-      }
-
-      // 日付マス目（イラスト風カードデザイン）
-      for (let d = 1; d <= lastDate; d++) {
-        const dStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-        const isDone = !!state.historyLogs[dStr];
-        const isSelected = (dStr === state.selectedRecordDate);
-        const isToday = (dStr === todayStr);
-
-        let cardBg = 'bg-slate-100 text-slate-700';
-        if (isDone) cardBg = 'bg-emerald-50 text-emerald-800 border-2 border-emerald-400 font-bold';
-        if (isSelected) cardBg += ' ring-2 ring-indigo-600 shadow-lg scale-105';
-
-        daysGrid += 
-          '<button onclick="selectDate(\'' + dStr + '\')" class="h-10 rounded-xl flex flex-col items-center justify-center relative transition-all text-xs font-semibold ' + cardBg + '">' +
-            '<span>' + d + '</span>' +
-            (isDone ? '<span class="text-[10px] text-emerald-600 font-extrabold leading-none">✓</span>' : '') +
-            (isToday ? '<span class="absolute top-1 right-1 w-2 h-2 bg-indigo-600 rounded-full"></span>' : '') +
-          '</button>';
-      }
-
-      return '<div class="mt-4 pt-4 border-t border-slate-100">' +
-          '<div class="flex items-center justify-between mb-3">' +
-            '<div class="text-xs font-bold text-slate-600">' + year + '年 ' + month + '月のカレンダー（日付タップで復習）</div>' +
-            (state.selectedRecordDate !== todayStr ? 
-              '<button onclick="selectDate(\'' + todayStr + '\')" class="text-xs text-indigo-600 font-bold underline">今日に戻る</button>' : ''
-            ) +
-          '</div>' +
-          '<div class="grid grid-cols-7 gap-1 text-center font-bold text-[11px] text-slate-400 mb-2">' +
-            '<div class="text-rose-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-indigo-500">土</div>' +
-          '</div>' +
-          '<div class="grid grid-cols-7 gap-1.5">' + daysGrid + '</div>' +
-        '</div>';
-    }
-
-    function render() {
-      const app = document.getElementById('app');
-      if (!app) return;
-
-      if (!state.isAuthenticated) {
-        app.innerHTML = 
-          '<div class="bg-white rounded-2xl shadow-xl p-8 mt-12 text-center border border-slate-100">' +
-            '<h2 class="text-2xl font-bold mb-2">ロシア語学習</h2>' +
-            '<p class="text-sm text-slate-500 mb-6">パスワードを入力してください</p>' +
-            '<form onsubmit="handleLogin(event)" class="space-y-4">' +
-              '<input type="password" id="passInput" autocomplete="new-password" value="' + state.passwordInput + '" oninput="state.passwordInput = this.value" placeholder="パスワード" class="w-full text-center px-4 py-3 rounded-xl border ' + (state.authError ? 'border-red-500' : 'border-slate-300') + ' focus:outline-none focus:ring-2 focus:ring-indigo-500">' +
-              (state.authError ? '<p class="text-xs text-red-500">パスワードが違います</p>' : '') +
-              '<button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-indigo-700 transition">ログイン</button>' +
-            '</form>' +
-          '</div>';
-        return;
-      }
-
-      const currentData = getCurrentData();
-      const recDate = state.selectedRecordDate;
-      const isCompleted = !!state.historyLogs[recDate];
-
-      let contentHtml = '';
-      if (state.mainTab === 'grammar') {
-        contentHtml = renderGrammarSection(currentData.sentences);
-      } else {
-        contentHtml = renderVocabSection(currentData.words);
-      }
-
-      app.innerHTML = 
-        '<div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mb-4 flex items-center justify-between">' +
-          '<div class="font-bold text-slate-800 text-lg">ロシア語 日課学習</div>' +
-          '<button onclick="handleLogout()" class="text-xs text-slate-400 hover:text-red-500">ロック</button>' +
-        '</div>' +
-        '<div class="bg-indigo-900 text-white rounded-2xl p-4 shadow-sm mb-4 flex justify-between items-center">' +
-          '<div class="text-xs text-indigo-200">表示中の学習日: <span class="font-bold text-white text-sm">' + recDate + '</span></div>' +
-          '<button onclick="forceNextSet()" class="bg-indigo-700 hover:bg-indigo-600 text-xs px-4 py-2.5 rounded-xl border border-indigo-500 font-bold transition">手動で更新</button>' +
-        '</div>' +
-        '<div class="grid grid-cols-2 gap-2 p-1 bg-slate-200/60 rounded-xl mb-4">' +
-          '<button onclick="switchMainTab(\'grammar\')" class="py-2.5 rounded-lg text-sm font-bold transition ' + (state.mainTab === 'grammar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600') + '">文法</button>' +
-          '<button onclick="switchMainTab(\'vocab\')" class="py-2.5 rounded-lg text-sm font-bold transition ' + (state.mainTab === 'vocab' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600') + '">単語</button>' +
-        '</div>' +
-        '<div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80 mb-6">' +
-          contentHtml +
-        '</div>' +
-        '<div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">' +
-          '<div class="text-sm font-bold text-slate-700 mb-3">実施記録</div>' +
-          '<div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">' +
-            '<div class="text-xs font-bold text-slate-600">' + recDate + ' の記録</div>' +
-            '<button onclick="toggleHistory(\'' + recDate + '\')" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ' + (isCompleted ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-slate-400 border-slate-200') + '">' +
-              (isCompleted ? '✓ 完了' : '○ 未完了') +
-            '</button>' +
-          '</div>' +
-          buildMonthCalendarHtml() +
-        '</div>';
-    }
-
     function renderGrammarSection(sentences) {
       const cur = sentences[state.grammarCardIdx];
       if (state.grammarSubTab === 'morning') {
@@ -356,4 +250,101 @@
         let testHtml = words.map(function(w, idx) {
           return '<div class="p-3 bg-slate-50 border rounded-xl space-y-2">' +
               '<div class="text-sm font-bold text-slate-800">' + w.jp + ' (' + w.reading + ')</div>' +
-              '<input type="text" oninput="state.vocabNightTyp
+              '<input type="text" oninput="state.vocabNightTyped[' + idx + '] = this.value" value="' + (state.vocabNightTyped[idx] || '') + '" placeholder="ロシア語を入力..." class="w-full p-2 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">' +
+              '<button onclick="state.vocabNightChecked[' + idx + '] = true; render();" class="w-full py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg">判定</button>' +
+              (state.vocabNightChecked[idx] ? 
+                '<div class="text-xs font-bold ' + ((state.vocabNightTyped[idx]||'').trim() === w.ru ? 'text-emerald-600' : 'text-rose-600') + '">' +
+                  ((state.vocabNightTyped[idx]||'').trim() === w.ru ? '◯ 正解！' : '× 正解: ' + w.ru) +
+                '</div>' : ''
+              ) +
+            '</div>';
+        }).join('');
+
+        return '<div class="flex justify-between items-center mb-4 pb-2 border-b">' +
+            '<span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">単語テスト</span>' +
+            '<button onclick="state.vocabMode = \'study\'; render();" class="text-xs text-slate-400">一覧に戻る</button>' +
+          '</div>' +
+          '<div class="space-y-4">' + testHtml + '</div>';
+      }
+    }
+
+    function render() {
+      const app = document.getElementById('app');
+      if (!app) return;
+
+      if (!state.isAuthenticated) {
+        app.innerHTML = 
+          '<div class="bg-white rounded-2xl shadow-xl p-8 mt-12 text-center border border-slate-100">' +
+            '<h2 class="text-2xl font-bold mb-2">ロシア語学習</h2>' +
+            '<p class="text-sm text-slate-500 mb-6">パスワードを入力してください</p>' +
+            '<form onsubmit="handleLogin(event)" class="space-y-4">' +
+              '<input type="password" id="passInput" autocomplete="new-password" value="' + state.passwordInput + '" oninput="state.passwordInput = this.value" placeholder="パスワード" class="w-full text-center px-4 py-3 rounded-xl border ' + (state.authError ? 'border-red-500' : 'border-slate-300') + ' focus:outline-none focus:ring-2 focus:ring-indigo-500">' +
+              (state.authError ? '<p class="text-xs text-red-500">パスワードが違います</p>' : '') +
+              '<button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-indigo-700 transition">ログイン</button>' +
+            '</form>' +
+          '</div>';
+        return;
+      }
+
+      const currentData = getCurrentData();
+      const recDate = state.selectedRecordDate;
+      const isCompleted = !!state.historyLogs[recDate];
+
+      let contentHtml = '';
+      if (state.mainTab === 'grammar') {
+        contentHtml = renderGrammarSection(currentData.sentences);
+      } else {
+        contentHtml = renderVocabSection(currentData.words);
+      }
+
+      // カレンダーマスの生成
+      const dateParts = recDate.split('-').map(Number);
+      const year = dateParts[0];
+      const month = dateParts[1];
+      const firstDay = new Date(year, month - 1, 1).getDay();
+      const lastDate = new Date(year, month, 0).getDate();
+      const todayStr = getTodayStr();
+
+      let daysGridHtml = '';
+      for (let i = 0; i < firstDay; i++) {
+        daysGridHtml += '<div class="h-9"></div>';
+      }
+      for (let d = 1; d <= lastDate; d++) {
+        const dStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        const isDone = !!state.historyLogs[dStr];
+        const isSelected = (dStr === recDate);
+        const isToday = (dStr === todayStr);
+
+        let cardBg = 'bg-slate-100 text-slate-700';
+        if (isDone) cardBg = 'bg-emerald-50 text-emerald-800 border-2 border-emerald-400 font-bold';
+        if (isSelected) cardBg += ' ring-2 ring-indigo-600 shadow-md scale-105';
+
+        daysGridHtml += 
+          '<button onclick="selectDate(\'' + dStr + '\')" class="h-10 rounded-xl flex flex-col items-center justify-center relative transition-all text-xs font-semibold ' + cardBg + '">' +
+            '<span>' + d + '</span>' +
+            (isDone ? '<span class="text-[10px] text-emerald-600 font-extrabold leading-none">✓</span>' : '') +
+            (isToday ? '<span class="absolute top-1 right-1 w-2 h-2 bg-indigo-600 rounded-full"></span>' : '') +
+          '</button>';
+      }
+
+      app.innerHTML = 
+        '<div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mb-4 flex items-center justify-between">' +
+          '<div class="font-bold text-slate-800 text-lg">ロシア語 日課学習</div>' +
+          '<button onclick="handleLogout()" class="text-xs text-slate-400 hover:text-red-500">ロック</button>' +
+        '</div>' +
+        '<div class="bg-indigo-900 text-white rounded-2xl p-4 shadow-sm mb-4 flex justify-between items-center">' +
+          '<div class="text-xs text-indigo-200">表示中の学習日: <span class="font-bold text-white text-sm">' + recDate + '</span></div>' +
+          '<button onclick="forceNextSet()" class="bg-indigo-700 hover:bg-indigo-600 text-xs px-4 py-2.5 rounded-xl border border-indigo-500 font-bold transition">手動で更新</button>' +
+        '</div>' +
+        '<div class="grid grid-cols-2 gap-2 p-1 bg-slate-200/60 rounded-xl mb-4">' +
+          '<button onclick="switchMainTab(\'grammar\')" class="py-2.5 rounded-lg text-sm font-bold transition ' + (state.mainTab === 'grammar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600') + '">文法</button>' +
+          '<button onclick="switchMainTab(\'vocab\')" class="py-2.5 rounded-lg text-sm font-bold transition ' + (state.mainTab === 'vocab' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600') + '">単語</button>' +
+        '</div>' +
+        '<div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80 mb-6">' +
+          contentHtml +
+        '</div>' +
+        '<div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">' +
+          '<div class="text-sm font-bold text-slate-700 mb-3">実施記録</div>' +
+          '<div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">' +
+            '<div class="text-xs font-bold text-slate-600">' + recDate + ' の記録</div>' +
+            '<button onclick="toggleHistory(\'' + recDate + '\')" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition ' + (isCompleted ? 'bg-emerald
