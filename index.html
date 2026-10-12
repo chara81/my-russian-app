@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ロシア語日課学習</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 p-3 sm:p-6">
+  <div id="app" class="max-w-xl mx-auto"></div>
+
+  <script>
+    // 自動キャッシュ対策（毎回最新版を読み込む）
+    if (!window.location.search.includes('v=')) {
+      const t = new Date().getTime();
+      window.location.replace(window.location.protocol + "//" + window.location.host + window.location.pathname + '?v=' + t);
+    }
+
+    const SECRET_PASSWORD = "5028";
+    const BASE_DATE_STR = "2026-10-09";
+
+    const SENTENCES_POOL = [
+      { ru: "Я читаю книгу.", jp: "私は本を読んでいます。" },
+      { ru: "Он пишет письма.", jp: "彼は手紙を書いています。" },
+      { ru: "Она изучает русский язык.", jp: "彼女はロシア語を勉強しています。" },
+      { ru: "Мы живем в Токио.", jp: "私たちは東京に住んでいます。" },
+      { ru: "Вы понимаете по-русски?", jp: "あなたはロシア語が分かりますか？" },
+      { ru: "Они смотрят новый фильм.", jp: "彼らは新しい映画を見ています。" },
+      { ru: "Я люблю слушать музыку.", jp: "私は音楽を聴くのが好きです。" },
+      { ru: "Брат работает в банке.", jp: "兄は銀行で働いています。" },
+      { ru: "Сестра пьет горячий чай.", jp: "姉は温かいお茶を飲んでいます。" },
+      { ru: "Мой друг хорошо говорит.", jp: "私の友達は上手に話します。" }
+    ];
+
+    const WORDS_POOL = [
+      { ru: "книга", reading: "クニーガ", jp: "本" },
+      { ru: "письмо", reading: "ピシモー", jp: "手紙" },
+      { ru: "город", reading: "ゴーロト", jp: "街・都市" },
+      { ru: "друг", reading: "ドルーグ", jp: "友達" },
+      { ru: "время", reading: "ヴレーミャ", jp: "時間" },
+      { ru: "работа", reading: "ラボータイ", jp: "仕事" },
+      { ru: "слово", reading: "スローヴォ", jp: "言葉・単語" },
+      { ru: "семья", reading: "セミヤー", jp: "家族" },
+      { ru: "утро", reading: "ウートロ", jp: "朝" },
+      { ru: "вечер", reading: "ヴェーチェル", jp: "夜・晩" }
+    ];
+
+    function getTodayStr() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      return y + "-" + m + "-" + d;
+    }
+
+    function addDaysToStr(dateStr, days) {
+      const parts = dateStr.split('-').map(Number);
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      d.setDate(d.getDate() + days);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return y + "-" + m + "-" + day;
+    }
+
+    function loadLogs() {
+      try {
+        return JSON.parse(localStorage.getItem('ru_app_history_logs') || '{}');
+      } catch(e) {
+        return {};
+      }
+    }
+
+    let state = {
+      isAuthenticated: false,
+      passwordInput: '',
+      authError: false,
+      mainTab: 'grammar',
+      manualOffset: parseInt(localStorage.getItem('ru_app_manual_offset') || '0', 10),
+      selectedRecordDate: getTodayStr(),
+      historyLogs: loadLogs(),
+      grammarCardIdx: 0,
+      grammarRevealed: false
+    };
+
+    function getSetIdx(dateStr) {
+      const b = BASE_DATE_STR.split('-').map(Number);
+      const t = dateStr.split('-').map(Number);
+      const baseDate = new Date(b[0], b[1] - 1, b[2]);
+      const targetDate = new Date(t[0], t[1] - 1, t[2]);
+      const diff = Math.floor((targetDate.getTime() - baseDate.getTime()) / (86400000));
+      let cycle = Math.floor(diff / 2);
+      if (cycle < 0) cycle = 0;
+      return cycle + state.manualOffset;
+    }
+
+    function render() {
+      const app = document.getElementById('app');
+      if (!app) return;
+      app.innerHTML = '';
+
+      // ログイン画面
+      if (!state.isAuthenticated) {
+        const loginCard = document.createElement('div');
+        loginCard.className = "bg-white rounded-2xl shadow-xl p-8 mt-12 text-center border border-slate-100";
+        
+        const h2 = document.createElement('h2');
+        h2.className = "text-2xl font-bold mb-2";
+        h2.textContent = "ロシア語学習";
+        
+        const p = document.createElement('p');
+        p.className = "text-sm text-slate-500 mb-6";
+        p.textContent = "パスワードを入力してください";
+        
+        const form = document.createElement('form');
+        form.onsubmit = function(e) {
+          e.preventDefault();
+          if (state.passwordInput === SECRET_PASSWORD) {
+            state.isAuthenticated = true;
+            state.authError = false;
+          } else {
+            state.authError = true;
+          }
+          render();
+        };
+
+        const input = document.createElement('input');
+        input.type = "password";
+        input.placeholder = "パスワード";
+        input.className = "w-full text-center px-4 py-3 rounded-xl border border-slate-300 mb-4 focus:outline-none";
+        input.oninput = function(e) { state.passwordInput = e.target.value; };
+
+        const btn = document.createElement('button');
+        btn.type = "submit";
+        btn.className = "w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow";
+        btn.textContent = "ログイン";
+
+        form.appendChild(input);
+        if (state.authError) {
+          const err = document.createElement('p');
+          err.className = "text-xs text-red-500 mb-2";
+          err.textContent = "パスワードが違います";
+          form.appendChild(err);
+        }
+        form.appendChild(btn);
+
+        loginCard.appendChild(h2);
+        loginCard.appendChild(p);
+        loginCard.appendChild(form);
+        app.appendChild(loginCard);
+        return;
+      }
+
+      // 学習アプリ本体
+      const recDate = state.selectedRecordDate;
+      const todayStr = getTodayStr();
+      const setIdx = getSetIdx(recDate);
+      const isDone = !!state.historyLogs[recDate];
+
+      // 1. ヘッダー
+      const header = document.createElement('div');
+      header.className = "bg-white rounded-2xl p-4 shadow-sm border mb-4 flex justify-between items-center";
+      header.innerHTML = '<span class="font-bold text-lg">ロシア語 日課学習</span>';
+      const lockBtn = document.createElement('button');
+      lockBtn.className = "text-xs text-slate-400";
+      lockBtn.textContent = "ロック";
+      lockBtn.onclick = function() { state.isAuthenticated = false; render(); };
+      header.appendChild(lockBtn);
+      app.appendChild(header);
+
+      // 2. 日付・更新バー
+      const bar = document.createElement('div');
+      bar.className = "bg-indigo-900 text-white rounded-2xl p-4 mb-4 flex justify-between items-center";
+      bar.innerHTML = '<div class="text-xs">表示中の学習日: <strong class="text-sm">' + recDate + '</strong></div>';
+      const nextBtn = document.createElement('button');
+      nextBtn.className = "bg-indigo-700 hover:bg-indigo-600 text-xs px-3 py-2 rounded-xl font-bold border border-indigo-500";
+      nextBtn.textContent = "手動で更新";
+      nextBtn.onclick = function() {
+        state.manualOffset += 1;
+        localStorage.setItem('ru_app_manual_offset', state.manualOffset.toString());
+        state.selectedRecordDate = addDaysToStr(state.selectedRecordDate, 1);
+        render();
+      };
+      bar.appendChild(nextBtn);
+      app.appendChild(bar);
+
+      // 3. タブ
+      const tabs = document.createElement('div');
+      tabs.className = "grid grid-cols-2 gap-2 p-1 bg-slate-200 rounded-xl mb-4";
+      
+      const gTab = document.createElement('button');
+      gTab.className = "py-2 rounded-lg font-bold text-sm " + (state.mainTab === 'grammar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600');
+      gTab.textContent = "文法";
+      gTab.onclick = function() { state.mainTab = 'grammar'; render(); };
+      
+      const vTab = document.createElement('button');
+      vTab.className = "py-2 rounded-lg font-bold text-sm " + (state.mainTab === 'vocab' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600');
+      vTab.textContent = "単語";
+      vTab.onclick = function() { state.mainTab = 'vocab'; render(); };
+
+      tabs.appendChild(gTab);
+      tabs.appendChild(vTab);
+      app.appendChild(tabs);
+
+      // 4. 問題表示カード
+      const card = document.createElement('div');
+      card.className = "bg-white rounded-2xl p-5 shadow-sm border mb-6";
+
+      if (state.mainTab === 'grammar') {
+        const cur = SENTENCES_POOL[(setIdx * 5 + state.grammarCardIdx) % SENTENCES_POOL.length];
+        
+        const qNum = document.createElement('div');
+        qNum.className = "text-center text-xs font-bold text-indigo-600 mb-2";
+        qNum.textContent = "問題 " + (state.grammarCardIdx + 1) + " / 5";
+        card.appendChild(qNum);
+
+        const ruText = document.createElement('div');
+        ruText.className = "text-center text-xl font-bold mb-4";
+        ruText.textContent = cur.ru;
+        card.appendChild(ruText);
+
+        if (state.grammarRevealed) {
+          const jpText = document.createElement('div');
+          jpText.className = "bg-indigo-50 p-3 rounded-xl text-center text-indigo-900 font-medium mb-4 text-sm";
+          jpText.textContent = cur.jp;
+          card.appendChild(jpText);
+        } else {
+          const showBtn = document.createElement('button');
+          showBtn.className = "w-full bg-slate-100 py-2.5 rounded-xl text-xs font-bold text-slate-600 mb-4";
+          showBtn.textContent = "答えを確認する";
+          showBtn.onclick = function() { state.grammarRevealed = true; render(); };
+          card.appendChild(showBtn);
+        }
+
+        const navRow = document.createElement('div');
+        navRow.className = "flex justify-between space-x-2";
+
+        const pBtn = document.createElement('button');
+        pBtn.className = "px-4 py-2 bg-slate-100 rounded-lg text-xs font-bold text-slate-600";
+        pBtn.textContent = "前へ";
+        pBtn.disabled = (state.grammarCardIdx === 0);
+        if (state.grammarCardIdx === 0) pBtn.className += " opacity-30";
+        pBtn.onclick = function() {
+          state.grammarCardIdx = Math.max(0, state.grammarCardIdx - 1);
+          state.grammarRevealed = false;
+          render();
+        };
+
+        const nBtn = document.createElement('button');
+        nBtn.className = "px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold";
+        nBtn.textContent = "次へ";
+        nBtn.disabled = (state.grammarCardIdx === 4);
+        if (state.grammarCardIdx === 4) nBtn.className += " opacity-30";
+        nBtn.onclick = function() {
+          state.grammarCardIdx = Math.min(4, state.grammarCardIdx + 1);
+          state.grammarRevealed = false;
+          render();
+        };
+
+        navRow.appendChild(pBtn);
+        navRow.appendChild(nBtn);
+        card.appendChild(navRow);
+      } else {
+        for (let i = 0; i < 5; i++) {
+          const w = WORDS_POOL[(setIdx * 5 + i) % WORDS_POOL.length];
+          const row = document.createElement('div');
+          row.className = "p-3 bg-slate-50 rounded-xl mb-2 flex justify-between items-center text-sm";
+          row.innerHTML = '<div><strong class="text-slate-800">' + w.ru + '</strong><div class="text-[10px] text-indigo-600">' + w.reading + '</div></div><div class="font-bold text-slate-600">' + w.jp + '</div>';
+          card.appendChild(row);
+        }
+      }
+      app.appendChild(card);
+
+      // 5. 実施記録＆イラスト風月間カレンダー
+      const recCard = document.createElement('div');
+      recCard.className = "bg-white rounded-2xl p-4 shadow-sm border";
+
+      const recHead = document.createElement('div');
+      recHead.className = "flex justify-between items-center mb-3 bg-slate-50 p-3 rounded-xl border";
+      recHead.innerHTML = '<span class="text-xs font-bold text-slate-700">' + recDate + ' の記録</span>';
+
+      const doneBtn = document.createElement('button');
+      doneBtn.className = "px-3 py-1.5 rounded-lg text-xs font-bold border transition " + (isDone ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-slate-400 border-slate-200');
+      doneBtn.textContent = isDone ? '✓ 完了' : '○ 未完了';
+      doneBtn.onclick = function() {
+        state.historyLogs[recDate] = !state.historyLogs[recDate];
+        localStorage.setItem('ru_app_history_logs', JSON.stringify(state.historyLogs));
+        render();
+      };
+      recHead.appendChild(doneBtn);
+      recCard.appendChild(recHead);
+
+      // カレンダー表示部
+      const calTitleRow = document.createElement('div');
+      calTitleRow.className = "flex justify-between items-center mt-4 mb-2 pt-3 border-t border-slate-100";
+      
+      const parts = recDate.split('-').map(Number);
+      const year = parts[0];
+      const month = parts[1];
+      
+      const titleSpan = document.createElement('span');
+      titleSpan.className = "text-xs font-bold text-slate-600";
+      titleSpan.textContent = year + "年 " + month + "月（日付タップで復習）";
+      calTitleRow.appendChild(titleSpan);
+
+      if (recDate !== todayStr) {
+        const backBtn = document.createElement('button');
+        backBtn.className = "text-xs text-indigo-600 font-bold underline";
+        backBtn.textContent = "今日に戻る";
+        backBtn.onclick = function() {
+          state.selectedRecordDate = todayStr;
+          render();
+        };
+        calTitleRow.appendChild(backBtn);
+      }
+      recCard.appendChild(calTitleRow);
+
+      // 曜日ヘッダー
+      const weekGrid = document.createElement('div');
+      weekGrid.className = "grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-2";
+      weekGrid.innerHTML = '<div class="text-rose-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-indigo-500">土</div>';
+      recCard.appendChild(weekGrid);
+
+      // グリッドマス目
+      const firstDay = new Date(year, month - 1, 1).getDay();
+      const lastDate = new Date(year, month, 0).getDate();
+      const grid = document.createElement('div');
+      grid.className = "grid grid-cols-7 gap-1.5";
+
+      for (let i = 0; i < firstDay; i++) {
+        const blank = document.createElement('div');
+        blank.className = "h-9";
+        grid.appendChild(blank);
+      }
+
+      for (let d = 1; d <= lastDate; d++) {
+        const dStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        const done = !!state.historyLogs[dStr];
+        const selected = (dStr === recDate);
+        const isToday = (dStr === todayStr);
+
+        let bg = 'bg-slate-100 text-slate-700';
+        if (done) bg = 'bg-emerald-50 text-emerald-800 border-2 border-emerald-400 font-bold';
+        if (selected) bg += ' ring-2 ring-indigo-600 shadow scale-105';
+
+        const dayBtn = document.createElement('button');
+        dayBtn.className = "h-9 rounded-xl flex flex-col items-center justify-center relative text-xs " + bg;
+        dayBtn.onclick = function() {
+          state.selectedRecordDate = dStr;
+          state.grammarCardIdx = 0;
+          state.grammarRevealed = false;
+          render();
+        };
+
+        const numSpan = document.createElement('span');
+        numSpan.textContent = d;
+        dayBtn.appendChild(numSpan);
+
+        if (done) {
+          const mark = document.createElement('span');
+          mark.className = "text-[9px] text-emerald-600 font-extrabold leading-none";
+          mark.textContent = "✓";
+          dayBtn.appendChild(mark);
+        }
+
+        if (isToday) {
+          const dot = document.createElement('span');
+          dot.className = "absolute top-1 right-1 w-1.5 h-1.5 bg-indigo-600 rounded-full";
+          dayBtn.appendChild(dot);
+        }
+
+        grid.appendChild(dayBtn);
+      }
+
+      recCard.appendChild(grid);
+      app.appendChild(recCard);
+    }
+
+    render();
+  </script>
+</body>
+  </html>
