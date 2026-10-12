@@ -16,11 +16,12 @@
   <div id="app" class="max-w-xl mx-auto"></div>
 
   <script>
-    // --- 基本設定 ---
-    const SECRET_PASSWORD = "5028"; 
-    const BASE_DATE_STR = "2026-10-09"; // 2日1セットの基準日
+    // --- 以前効果があった安全初期化（不要・破損データの自動クリーン） ---
+    try { localStorage.removeItem('ru_app_logs'); } catch(e){}
 
-    // --- 文法プール（30文） ---
+    const SECRET_PASSWORD = "5028"; 
+    const BASE_DATE_STR = "2026-10-09";
+
     const SENTENCES_POOL = [
       { ru: "Я читаю книгу.", jp: "私は本を読んでいます。" },
       { ru: "Он пишет письма.", jp: "彼は手紙を書いています。" },
@@ -54,7 +55,6 @@
       { ru: "Спасибо за помощь.", jp: "助けてくれてありがとう。" }
     ];
 
-    // --- 単語プール（30語） ---
     const WORDS_POOL = [
       { ru: "книга", reading: "クニーガ", jp: "本" },
       { ru: "письмо", reading: "ピシモー", jp: "手紙" },
@@ -88,7 +88,6 @@
       { ru: "мясо", reading: "ミャーサ", jp: "肉" }
     ];
 
-    // 日付ヘルパー
     function getTodayStr() {
       const now = new Date();
       const y = now.getFullYear();
@@ -107,7 +106,15 @@
       return y + "-" + m + "-" + day;
     }
 
-    // アプリ状態
+    // --- 以前効果があった安全取得関数 ---
+    function loadHistoryLogs() {
+      try {
+        return JSON.parse(localStorage.getItem('ru_app_history_logs') || '{}');
+      } catch (e) {
+        return {};
+      }
+    }
+
     let state = {
       isAuthenticated: false,
       passwordInput: '',
@@ -115,7 +122,7 @@
       mainTab: 'grammar',
       manualOffset: parseInt(localStorage.getItem('ru_app_manual_offset') || '0', 10),
       selectedRecordDate: getTodayStr(),
-      historyLogs: JSON.parse(localStorage.getItem('ru_app_history_logs') || '{}'),
+      historyLogs: loadHistoryLogs(),
       grammarSubTab: 'morning',
       grammarCardIdx: 0,
       grammarMorningRevealed: false,
@@ -126,7 +133,6 @@
       vocabNightChecked: {}
     };
 
-    // 指定日のセットインデックス取得
     function getSetIndexForDate(targetDateStr) {
       const b = BASE_DATE_STR.split('-').map(Number);
       const t = targetDateStr.split('-').map(Number);
@@ -179,7 +185,6 @@
       state.vocabNightChecked = {};
     }
 
-    // 文法描画
     function renderGrammarSection(sentences) {
       const cur = sentences[state.grammarCardIdx];
       if (state.grammarSubTab === 'morning') {
@@ -239,7 +244,6 @@
       }
     }
 
-    // 単語描画
     function renderVocabSection(words) {
       if (state.vocabMode === 'study') {
         let listHtml = words.map(function(w) {
@@ -276,7 +280,6 @@
       }
     }
 
-    // メイン描画
     function render() {
       const app = document.getElementById('app');
       if (!app) return;
@@ -306,7 +309,7 @@
         contentHtml = renderVocabSection(currentData.words);
       }
 
-      // 月間カレンダーマスの生成
+      // 月間カレンダーグリッドの組み立て
       const dateParts = recDate.split('-').map(Number);
       const year = dateParts[0];
       const month = dateParts[1];
@@ -354,5 +357,4 @@
         '</div>' +
         '<div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">' +
           '<div class="text-sm font-bold text-slate-700 mb-3">実施記録</div>' +
-          '<div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">' +
-            '<div class="text-xs font-bold text-slate-600">' + recDate + ' 
+          '<div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl borde
