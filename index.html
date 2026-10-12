@@ -3,29 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
   <title>ロシア語日課学習</title>
-  <script>
-    // 自動的にキャッシュを回避してTailwindを読み込む
-    const script = document.createElement('script');
-    script.src = "https://cdn.tailwindcss.com?t=" + new Date().getTime();
-    document.head.appendChild(script);
-  </script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; color: #1e293b; padding: 16px; }
+    .container { max-width: 500px; margin: 0 auto; }
+    .card { background: #ffffff; padding: 16px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .btn { background: #4f46e5; color: white; border: none; padding: 10px 16px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; width: 100%; }
+    .btn-sub { background: #f1f5f9; color: #475569; }
+    .header { display: flex; justify-content: space-between; align-items: center; }
+    .bar { background: #1e1b4b; color: white; padding: 12px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 12px; }
+    .bar button { background: #3730a3; color: white; border: 1px solid #4338ca; padding: 6px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #e2e8f0; padding: 4px; border-radius: 12px; margin-bottom: 12px; }
+    .tab-btn { padding: 8px; border: none; border-radius: 8px; font-weight: bold; color: #64748b; background: transparent; cursor: pointer; }
+    .tab-btn.active { background: #ffffff; color: #4f46e5; }
+    .word-row { padding: 10px; background: #f8fafc; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+    .grid-7 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; margin-top: 8px; }
+    .week-head { font-size: 10px; font-weight: bold; color: #94a3b8; }
+    .day-box { height: 36px; background: #f1f5f9; border-radius: 8px; border: 1px solid transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; cursor: pointer; position: relative; }
+    .day-box.done { background: #ecfdf5; border-color: #34d399; color: #065f46; font-weight: bold; }
+    .day-box.selected { border-color: #4f46e5; border-width: 2px; }
+    .today-dot { width: 5px; height: 5px; background: #4f46e5; border-radius: 50%; position: absolute; top: 3px; right: 3px; }
+    input[type="password"] { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; text-align: center; margin-bottom: 12px; font-size: 14px; }
   </style>
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800 p-3 sm:p-6">
-  <div id="app" class="max-w-xl mx-auto"></div>
+<body>
+  <div id="app" class="container"></div>
 
   <script>
-    const SECRET_PASSWORD = "5028";
-    const BASE_DATE_STR = "2026-10-09";
+    var SECRET_PASSWORD = "5028";
+    var BASE_DATE_STR = "2026-10-09";
 
     // --- 文法プール（150文＝30セット分） ---
-    const SENTENCES_POOL = [
+    var SENTENCES_POOL = [
       // Set 1
       { ru: "Я читаю книгу.", jp: "私は本を読んでいます。" },
       { ru: "Он пишет письма.", jp: "彼は手紙を書いています。" },
@@ -76,7 +86,7 @@
       { ru: "Они обедают в ресторане.", jp: "彼らはレストランで昼食をとっています。" },
       // Set 9
       { ru: "Я заказываю пиццу.", jp: "私はピザを注文しています。" },
-      { ru: "Ты понимаешь هذا文?", jp: "君はこの文章が分かりますか？" },
+      { ru: "Ты понимаешь этот текст?", jp: "君はこの文章が分かりますか？" },
       { ru: "Она очень красиво танцует.", jp: "彼女はとても綺麗に踊ります。" },
       { ru: "Мы ждем гостей.", jp: "私たちは客を待っています。" },
       { ru: "Ученики слушают учителя.", jp: "生徒たちは先生の話を聞いています。" },
@@ -91,7 +101,7 @@
       { ru: "Она учит новые слова.", jp: "彼女は新しい単語を覚えています。" },
       { ru: "Он играет на гитаре.", jp: "彼はギターを弾きます。" },
       { ru: "Мы смотрим на карту.", jp: "私たちは地図を見ています。" },
-      { ru: "Они едут на поезд.", jp: "彼らは電車に乗っています。" },
+      { ru: "Они едут на поезде.", jp: "彼らは電車に乗っています。" },
       // Set 12
       { ru: "Я пью холодную воду.", jp: "私は冷たい水を飲んでいます。" },
       { ru: "Она берет сумку.", jp: "彼女はバッグを持っていきます。" },
@@ -111,7 +121,7 @@
       { ru: "Мы покупаем билеты.", jp: "私たちはチケットを買います。" },
       { ru: "Вы любите кофе?", jp: "あなたはコーヒーが好きですか？" },
       // Set 15
-      { ru: "Я хочу пить水.", jp: "私は水が飲みたいです。" },
+      { ru: "Я хочу пить воду.", jp: "私は水が飲みたいです。" },
       { ru: "Она изучает физику.", jp: "彼女は物理学を学んでいます。" },
       { ru: "Он играет в футбол.", jp: "彼はサッカーをしています。" },
       { ru: "Мы встречаем друга.", jp: "私たちは友達を出迎えます。" },
@@ -142,7 +152,7 @@
       { ru: "Они слушают музыку.", jp: "彼らは音楽を聴いています。" },
       // Set 20
       { ru: "Я помню этот день.", jp: "私はこの日を覚えています。" },
-      { ru: "Она заходит в комнатy.", jp: "彼女は部屋に入してきます。" },
+      { ru: "Она заходит в комнату.", jp: "彼女は部屋に入ってきます。" },
       { ru: "Он выходит из дома.", jp: "彼は家から出ていきます。" },
       { ru: "Мы едем в центр.", jp: "私たちは中心部へ行きます。" },
       { ru: "Вы часто путешествуете?", jp: "あなたはよく旅行をしますか？" },
@@ -209,7 +219,7 @@
     ];
 
     // --- 単語プール（150語＝30セット分） ---
-    const WORDS_POOL = [
+    var WORDS_POOL = [
       // Set 1
       { ru: "книга", reading: "クニーガ", jp: "本" },
       { ru: "письмо", reading: "ピシモー", jp: "手紙" },
@@ -351,7 +361,7 @@
       // Set 24
       { ru: "ответ", reading: "アトヴェート", jp: "答え" },
       { ru: "задача", reading: "ザダーチャ", jp: "課題・問題" },
-      { ru: "правило", reading: "プラーヴィロ", jp: "ルール・規則" },
+      { ru: "правило", reading: "プラーヴィро", jp: "ルール・規則" },
       { ru: "план", reading: "プラーン", jp: "計画・プラン" },
       { ru: "спорт", reading: "スポールト", jp: "スポーツ" },
       // Set 25
@@ -382,62 +392,4 @@
       { ru: "запах", reading: "ザーパフ", jp: "匂い・香り" },
       { ru: "сила", reading: "シーラ", jp: "力" },
       { ru: "ум", reading: "ウーム", jp: "知恵・知性" },
-      { ru: "душа", reading: "ドゥシャー", jp: "魂・心" },
-      { ru: "радость", reading: "ラードスチ", jp: "喜び" },
-      // Set 30
-      { ru: "счастье", reading: "スチャースチエ", jp: "幸せ" },
-      { ru: "любовь", reading: "リュボーフィ", jp: "愛" },
-      { ru: "миг", reading: "ミーグ", jp: "瞬間" },
-      { ru: "цель", reading: "ツェーリ", jp: "目的・ゴール" },
-      { ru: "мечта", reading: "メチター", jp: "夢" }
-    ];
-
-    function getTodayStr() {
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const d = String(now.getDate()).padStart(2, '0');
-      return y + "-" + m + "-" + d;
-    }
-
-    function addDaysToStr(dateStr, days) {
-      const parts = dateStr.split('-').map(Number);
-      const d = new Date(parts[0], parts[1] - 1, parts[2]);
-      d.setDate(d.getDate() + days);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return y + "-" + m + "-" + day;
-    }
-
-    function loadLogs() {
-      try {
-        return JSON.parse(localStorage.getItem('ru_app_history_logs') || '{}');
-      } catch(e) {
-        return {};
-      }
-    }
-
-    let state = {
-      isAuthenticated: false,
-      passwordInput: '',
-      authError: false,
-      mainTab: 'grammar',
-      manualOffset: parseInt(localStorage.getItem('ru_app_manual_offset') || '0', 10),
-      selectedRecordDate: getTodayStr(),
-      historyLogs: loadLogs(),
-      grammarCardIdx: 0,
-      grammarRevealed: false
-    };
-
-    function getSetIdx(dateStr) {
-      const b = BASE_DATE_STR.split('-').map(Number);
-      const t = dateStr.split('-').map(Number);
-      const baseDate = new Date(b[0], b[1] - 1, b[2]);
-      const targetDate = new Date(t[0], t[1] - 1, t[2]);
-      const diff = Math.floor((targetDate.getTime() - baseDate.getTime()) / (86400000));
-      let cycle = Math.floor(diff / 2);
-      if (cycle < 0) cycle = 0;
-      return cycle + state.manualOffset;
-    }
-
+      { ru: "душа", reading: "ドゥシャー", jp: "魂・
