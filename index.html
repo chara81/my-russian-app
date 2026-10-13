@@ -35,9 +35,8 @@
   <div id="app" class="container"></div>
 
   <script>
-    // ★ここを変更したいパスワードに書き換えてください（半角英数字）
     var SECRET_PASSWORD = "5028";
-    var BASE_DATE_STR = "2026-10-13"; // 本日を開始日として設定
+    var BASE_DATE_STR = "2026-10-13";
 
     // --- 文法プール（150文＝30セット） ---
     var SENTENCES_POOL = [
@@ -221,7 +220,7 @@
       { ru: "стул", reading: "ストゥール", jp: "椅子" },
       { ru: "ручка", reading: "ルーチカ", jp: "ペン" },
       { ru: "тетрадь", reading: "チトラージ", jp: "ノート" },
-      { ru: "яблоко", reading: "ヤーブラコ", jp: "りんго" },
+      { ru: "яблоко", reading: "ヤーブラコ", jp: "りんご" },
       { ru: "молоко", reading: "マラコー", jp: "牛乳" },
       { ru: "рыба", reading: "ルィーバ", jp: "魚" },
       { ru: "мясо", reading: "ミャーサ", jp: "肉" },
@@ -374,13 +373,12 @@
     var state = {
       isAuthenticated: false,
       authError: false,
-      mainTab: 'grammar', // 'grammar' | 'vocab' | 'review'
-      mode: 'morning', // 'morning' | 'test'
+      mainTab: 'grammar',
+      mode: 'morning',
       manualOffset: parseInt(localStorage.getItem('ru_app_manual_offset') || '0', 10),
       selectedRecordDate: getTodayStr(),
       historyLogs: safeParse('ru_app_history_logs') || {},
-      reviewPool: safeParse('ru_app_review_pool') || [], // {type, item}
-      // テスト状態
+      reviewPool: safeParse('ru_app_review_pool') || [],
       testIdx: 0,
       testFailCount: 0,
       testInput: '',
@@ -388,7 +386,7 @@
       testShowAnswer: false
     };
 
-    // 経過日数と日の判定（Day 1 or Day 2）
+    // 日付ごとのセットインデックス算出（1日ごとに1セット進む）
     function getDayInfo(dateStr) {
       var b = BASE_DATE_STR.split('-');
       var t = dateStr.split('-');
@@ -396,10 +394,11 @@
       var targetDate = new Date(parseInt(t[0],10), parseInt(t[1],10) - 1, parseInt(t[2],10));
       var diffDays = Math.floor((targetDate.getTime() - baseDate.getTime()) / 86400000) + state.manualOffset;
       if (diffDays < 0) diffDays = 0;
-      
-      var cycleIdx = Math.floor(diffDays / 2); // 2日で1セット進行
-      var dayInCycle = (diffDays % 2) + 1;     // 1日目(1) or 2日目(2)
-      return { cycleIdx: cycleIdx, dayInCycle: dayInCycle, totalDays: diffDays + 1 };
+
+      // 日付ごとにセット（0〜29）が進む
+      var setIdx = diffDays;
+      var dayInCycle = (diffDays % 2) + 1; // 奇数日(Day 1) / 偶数日(Day 2)の切り替え用
+      return { setIdx: setIdx, dayInCycle: dayInCycle, totalDays: diffDays + 1 };
     }
 
     function saveReviewPool() {
@@ -431,7 +430,6 @@
       if (!app) return;
       app.innerHTML = '';
 
-      // 1. ログイン認証
       if (!state.isAuthenticated) {
         var loginCard = document.createElement('div');
         loginCard.className = "card";
@@ -462,7 +460,7 @@
         form.appendChild(btn);
         loginCard.appendChild(form);
         app.appendChild(loginCard);
-        
+
         setTimeout(function() {
           var el = document.getElementById('pass_input');
           if (el) el.focus();
@@ -473,11 +471,11 @@
       var recDate = state.selectedRecordDate;
       var todayStr = getTodayStr();
       var dayInfo = getDayInfo(recDate);
-      var setIdx = dayInfo.cycleIdx;
+      var setIdx = dayInfo.setIdx;
       var dayInCycle = dayInfo.dayInCycle;
       var isDone = !!state.historyLogs[recDate];
 
-      // --- アプリヘッダー ---
+      // --- ヘッダー ---
       var header = document.createElement('div');
       header.className = "card header";
       header.innerHTML = '<strong>ロシア語 日課学習</strong>';
@@ -494,7 +492,7 @@
       // --- 学習日操作バー ---
       var bar = document.createElement('div');
       bar.className = "bar";
-      bar.innerHTML = '<div>学習日: <strong>' + recDate + '</strong> <span style="font-size:10px;opacity:0.8;">(' + dayInfo.totalDays + '日目 / Cycle Day ' + dayInCycle + ')</span></div>';
+      bar.innerHTML = '<div>学習日: <strong>' + recDate + '</strong> <span style="font-size:10px;opacity:0.8;">(' + dayInfo.totalDays + '日目)</span></div>';
       var nextBtn = document.createElement('button');
       nextBtn.textContent = "手動で翌日へ";
       nextBtn.onclick = function() {
@@ -507,10 +505,10 @@
       bar.appendChild(nextBtn);
       app.appendChild(bar);
 
-      // --- タブ（文法 / 単語 / 復習） ---
+      // --- タブ ---
       var tabs = document.createElement('div');
       tabs.className = "tabs";
-      
+
       var gTab = document.createElement('button');
       gTab.className = "tab-btn " + (state.mainTab === 'grammar' ? 'active' : '');
       gTab.textContent = "文法";
@@ -531,11 +529,10 @@
       tabs.appendChild(rTab);
       app.appendChild(tabs);
 
-      // --- メイン学習コンテンツエリア ---
+      // --- メインコンテンツ ---
       var card = document.createElement('div');
       card.className = "card";
 
-      // モード切り替え（朝の学習 vs テスト）
       if (state.mainTab !== 'review') {
         var modeSwitch = document.createElement('div');
         modeSwitch.style.display = "flex";
@@ -563,7 +560,7 @@
         card.appendChild(modeSwitch);
       }
 
-      // --- 文法セクション ---
+      // --- 文法 ---
       if (state.mainTab === 'grammar') {
         var currentSet = [];
         for (var i = 0; i < 5; i++) {
@@ -571,9 +568,8 @@
         }
 
         if (state.mode === 'morning') {
-          // 【文法：朝の学習】和訳は隠してロシア語のみ提示（確認ボタンで表示）
           card.appendChild(createBadge('文法：朝の確認（ロシア語のみ表示）'));
-          
+
           for (var k = 0; k < 5; k++) {
             (function(idx) {
               var item = currentSet[idx];
@@ -581,7 +577,7 @@
               box.className = "word-row";
               box.style.flexDirection = "column";
               box.style.alignItems = "flex-start";
-              
+
               var ruLabel = document.createElement('div');
               ruLabel.style.fontSize = "16px";
               ruLabel.style.fontWeight = "bold";
@@ -594,7 +590,7 @@
               showBtn.style.padding = "4px 8px";
               showBtn.style.fontSize = "11px";
               showBtn.textContent = "和訳を確認";
-              
+
               var jpLabel = document.createElement('div');
               jpLabel.style.fontSize = "13px";
               jpLabel.style.color = "#4f46e5";
@@ -612,7 +608,6 @@
             })(k);
           }
         } else {
-          // 【文法：テストモード】問1〜4: 露→和 / 問5: 和→露
           if (state.testIdx >= 5) {
             card.innerHTML = '<div style="text-align:center;padding:20px;"><h3 style="color:#10b981;margin-bottom:8px;">🎉 文法テスト完了！</h3><p style="font-size:13px;color:#64748b;">お疲れ様でした。下の記録ボタンで完了をマークしましょう。</p></div>';
           } else {
@@ -649,7 +644,6 @@
 
               if (!userAns) return;
 
-              // 判定（ゆるい部分一致許容）
               var isCorrect = false;
               if (isQuestion5) {
                 isCorrect = (userAns.toLowerCase() === targetAns.toLowerCase());
@@ -716,7 +710,7 @@
         }
       }
 
-      // --- 単語セクション ---
+      // --- 単語 ---
       if (state.mainTab === 'vocab') {
         var currentSet = [];
         for (var i = 0; i < 5; i++) {
@@ -724,9 +718,7 @@
         }
 
         if (state.mode === 'morning') {
-          // 【単語：朝の学習】
           if (dayInCycle === 1) {
-            // Day 1: ロシア語単語（読み・意味付き）を表示
             card.appendChild(createBadge('単語：1日目の朝（ロシア語・読み・意味）'));
             for (var k = 0; k < 5; k++) {
               var w = currentSet[k];
@@ -736,7 +728,6 @@
               card.appendChild(row);
             }
           } else {
-            // Day 2: 日本語と読みを表示し、ロシア語を入力する練習
             card.appendChild(createBadge('単語：2日目の朝（日本語からロシア語練習）'));
             for (var k = 0; k < 5; k++) {
               (function(idx) {
@@ -760,7 +751,7 @@
                 checkBtn.style.padding = "4px 8px";
                 checkBtn.style.fontSize = "10px";
                 checkBtn.textContent = "正解を表示";
-                
+
                 var ansSp = document.createElement('span');
                 ansSp.style.color = "#4f46e5";
                 ansSp.style.fontWeight = "bold";
@@ -780,7 +771,6 @@
             }
           }
         } else {
-          // 【単語：テストモード】
           if (state.testIdx >= 5) {
             card.innerHTML = '<div style="text-align:center;padding:20px;"><h3 style="color:#10b981;margin-bottom:8px;">🎉 単語テスト完了！</h3><p style="font-size:13px;color:#64748b;">お疲れ様でした。下の記録ボタンで完了をマークしましょう。</p></div>';
           } else {
@@ -882,7 +872,7 @@
         }
       }
 
-      // --- 復習リストセクション ---
+      // --- 復習リスト ---
       if (state.mainTab === 'review') {
         card.appendChild(createBadge('要復習（テストで3回間違えた問題）'));
 
