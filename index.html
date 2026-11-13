@@ -23,9 +23,11 @@
     .day-box { height: 36px; background: #f1f5f9; border-radius: 8px; border: 1px solid transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; cursor: pointer; position: relative; }
     .day-box.done { background: #ecfdf5; border-color: #34d399; color: #065f46; font-weight: bold; }
     .day-box.selected { border-color: #4f46e5; border-width: 2px; }
+    .day-box.weekend { background: #f1f5f9; opacity: 0.6; }
     .today-dot { width: 5px; height: 5px; background: #4f46e5; border-radius: 50%; position: absolute; top: 3px; right: 3px; }
     input[type="text"], input[type="password"] { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; text-align: center; margin-bottom: 12px; font-size: 14px; }
     .badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; background: #e0e7ff; color: #3730a3; margin-bottom: 12px; }
+    .badge-friday { background: #fef3c7; color: #92400e; }
     .error-text { color: #ef4444; font-size: 13px; margin-top: 8px; text-align: center; font-weight: bold; }
     .section-title { font-size: 15px; font-weight: bold; margin-bottom: 10px; color: #1e1b4b; display: flex; justify-content: space-between; align-items: center; }
   </style>
@@ -35,7 +37,8 @@
 
   <script>
     var SECRET_PASSWORD = "5028";
-    var BASE_DATE_STR = "2026-10-13";
+    // 2026-10-12（月曜日）を開始基準日に設定（月・火＝セット1、水・木＝セット2、金＝まとめ）
+    var BASE_DATE_STR = "2026-10-12";
 
     var SENTENCES_POOL = [
       { ru: "Я читаю книгу.", jp: "私は本を読んでいます。" },
@@ -265,7 +268,7 @@
       { ru: "мама", reading: "マーマ", jp: "お母さん" },
       { ru: "брат", reading: "ブラート", jp: "兄弟・兄・弟" },
       { ru: "сестра", reading: "シストラ", jp: "姉妹・姉・妹" },
-      { ru: "сын", reading: "スィн", jp: "息子" },
+      { ru: "сын", reading: "スィン", jp: "息子" },
       { ru: "дочь", reading: "ドーチ", jp: "娘" },
       { ru: "врач", reading: "ヴラーチ", jp: "医師" },
       { ru: "учитель", reading: "ウチーテリ", jp: "先生・教師" },
@@ -320,7 +323,7 @@
       { ru: "земля", reading: "ズィムリャー", jp: "地球・土地" },
       { ru: "камень", reading: "カーメニ", jp: "石" },
       { ru: "лекарство", reading: "レカールストヴォ", jp: "薬" },
-      { ru: "подарок", reading: "パダーロク", jp: "プレゼント・贈り物" },
+      { ru: "подарок", reading: "パダーロк", jp: "プレゼント・贈り物" },
       { ru: "праздник", reading: "プラーズニク", jp: "祝日・祭り" },
       { ru: "успех", reading: "ウスペーフ", jp: "成功" },
       { ru: "ошибка", reading: "アシープカ", jp: "間違い・ミス" },
@@ -367,15 +370,17 @@
       } catch (e) { return null; }
     }
 
+    // 古いオフセットデータをリセットしてズレを防止
+    localStorage.removeItem('ru_app_manual_offset');
+
     var state = {
       isAuthenticated: false,
       authError: false,
-      activeTest: null, // null | 'grammar' | 'vocab'
-      manualOffset: parseInt(localStorage.getItem('ru_app_manual_offset') || '0', 10),
+      activeTest: null,
       selectedRecordDate: getTodayStr(),
       historyLogs: safeParse('ru_app_history_logs') || {},
       reviewPool: safeParse('ru_app_review_pool') || [],
-      // テスト専用状態（テスト画面を抜けない限り絶対にリセットされない）
+      failCounts: safeParse('ru_app_fail_counts') || {},
       testIdx: 0,
       testFailCount: 0,
       testInput: '',
@@ -383,17 +388,73 @@
       testShowAnswer: false
     };
 
+    function saveFailCounts() {
+      localStorage.setItem('ru_app_fail_counts', JSON.stringify(state.failCounts));
+    }
+
+    function recordFail(itemRu) {
+      state.failCounts[itemRu] = (state.failCounts[itemRu] || 0) + 1;
+      saveFailCounts();
+    }
+
+    // 土日・金曜を除いた「通常学習日（月・火・水・木）」のみをカウントして1日目・2日目を厳密に算出
     function getDayInfo(dateStr) {
       var b = BASE_DATE_STR.split('-');
       var t = dateStr.split('-');
       var baseDate = new Date(parseInt(b[0],10), parseInt(b[1],10) - 1, parseInt(b[2],10));
       var targetDate = new Date(parseInt(t[0],10), parseInt(t[1],10) - 1, parseInt(t[2],10));
-      var diffDays = Math.floor((targetDate.getTime() - baseDate.getTime()) / 86400000) + state.manualOffset;
-      if (diffDays < 0) diffDays = 0;
 
-      var setIdx = diffDays;
-      var dayInCycle = (diffDays % 2) + 1;
-      return { setIdx: setIdx, dayInCycle: dayInCycle, totalDays: diffDays + 1 };
+      var dayOfWeek = targetDate.getDay(); // 0:日, 1:月, 2:火, 3:水, 4:木, 5:金, 6:土
+      var isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+      var isFriday = (dayOfWeek === 5);
+
+      // 基準日（月曜）から対象日までの間にある「月・火・水・木」の回数を数える
+      var regularStudyDays = 0;
+      var totalWeekdays = 0;
+
+      if (targetDate >= baseDate) {
+        var cur = new Date(baseDate.getTime());
+        while (cur < targetDate) {
+          var dow = cur.getDay();
+          if (dow !== 0 && dow !== 6) {
+            totalWeekdays++;
+            if (dow !== 5) { // 金曜以外の平日（月〜木）
+              regularStudyDays++;
+            }
+          }
+          cur.setDate(cur.getDate() + 1);
+        }
+      }
+
+      // 月・水は1日目、火・木は2日目に必ず一致する
+      var cycleIdx = Math.floor(regularStudyDays / 2);
+      var dayInCycle = (regularStudyDays % 2) + 1;
+
+      return {
+        cycleIdx: cycleIdx,
+        dayInCycle: dayInCycle,
+        totalDays: totalWeekdays + 1,
+        isWeekend: isWeekend,
+        isFriday: isFriday,
+        dayOfWeek: dayOfWeek
+      };
+    }
+
+    function getTopWeakWords(setIdx) {
+      var sorted = WORDS_POOL.slice().sort(function(a, b) {
+        var countA = state.failCounts[a.ru] || 0;
+        var countB = state.failCounts[b.ru] || 0;
+        return countB - countA;
+      });
+
+      var weakList = sorted.slice(0, 5);
+      if ((state.failCounts[weakList[0].ru] || 0) === 0) {
+        weakList = [];
+        for (var i = 0; i < 5; i++) {
+          weakList.push(WORDS_POOL[(setIdx * 5 + i) % WORDS_POOL.length]);
+        }
+      }
+      return weakList;
     }
 
     function saveReviewPool() {
@@ -425,7 +486,6 @@
       if (!app) return;
       app.innerHTML = '';
 
-      // --- 0. ログイン判定 ---
       if (!state.isAuthenticated) {
         var loginCard = document.createElement('div');
         loginCard.className = "card";
@@ -467,11 +527,14 @@
       var recDate = state.selectedRecordDate;
       var todayStr = getTodayStr();
       var dayInfo = getDayInfo(recDate);
-      var setIdx = dayInfo.setIdx;
+      var setIdx = dayInfo.cycleIdx;
       var dayInCycle = dayInfo.dayInCycle;
       var isDone = !!state.historyLogs[recDate];
 
-      // --- 1. テストモード中：他をすべて非表示にしてテスト画面のみ表示 ---
+      var weekNames = ['日', '月', '火', '水', '木', '金', '土'];
+      var currentWeekName = weekNames[dayInfo.dayOfWeek];
+
+      // --- テスト専用画面 ---
       if (state.activeTest !== null) {
         var testCard = document.createElement('div');
         testCard.className = "card";
@@ -479,13 +542,18 @@
 
         var isGrammar = (state.activeTest === 'grammar');
         var currentSet = [];
+
         if (isGrammar) {
           for (var i = 0; i < 5; i++) {
             currentSet.push(SENTENCES_POOL[(setIdx * 5 + i) % SENTENCES_POOL.length]);
           }
         } else {
-          for (var i = 0; i < 5; i++) {
-            currentSet.push(WORDS_POOL[(setIdx * 5 + i) % WORDS_POOL.length]);
+          if (dayInfo.isFriday) {
+            currentSet = getTopWeakWords(setIdx);
+          } else {
+            for (var i = 0; i < 5; i++) {
+              currentSet.push(WORDS_POOL[(setIdx * 5 + i) % WORDS_POOL.length]);
+            }
           }
         }
 
@@ -496,9 +564,9 @@
         topRow.style.marginBottom = "12px";
 
         var titleBadge = document.createElement('div');
-        titleBadge.className = "badge";
+        titleBadge.className = "badge " + (dayInfo.isFriday ? "badge-friday" : "");
         titleBadge.style.margin = "0";
-        titleBadge.textContent = (isGrammar ? "文法" : "単語") + "テスト専用画面";
+        titleBadge.textContent = (dayInfo.isFriday ? "【金曜まとめ】" : "") + (isGrammar ? "文法" : "単語") + "テスト画面";
 
         var exitBtn = document.createElement('button');
         exitBtn.className = "btn btn-sub";
@@ -533,9 +601,8 @@
           qNumLabel.style.textAlign = "center";
 
           var isQuestion5 = isGrammar && (state.testIdx === 4);
-          var isVocabDay2 = (!isGrammar) && (dayInCycle === 2);
-
-          var showTargetJp = isQuestion5 || isVocabDay2; // 日本語のお題を表示するかどうか
+          var isVocabDay2 = (!isGrammar) && (dayInCycle === 2) && (!dayInfo.isFriday);
+          var showTargetJp = isQuestion5 || isVocabDay2;
 
           if (isGrammar) {
             qNumLabel.textContent = "第 " + (state.testIdx + 1) + " 問 / 5 (" + (isQuestion5 ? "日本語 → ロシア語" : "ロシア語 → 日本語") + ")";
@@ -587,6 +654,8 @@
               state.testShowAnswer = false;
             } else {
               state.testFailCount++;
+              recordFail(curItem.ru);
+
               if (state.testFailCount >= 3) {
                 state.testFeedback = "❌ 3回間違えました。答えを表示し、復習リストに追加しました。";
                 state.testShowAnswer = true;
@@ -642,12 +711,10 @@
         }
 
         app.appendChild(testCard);
-        return; // テスト中はここで描画を終了（他をすべて隠す）
+        return;
       }
 
-      // --- 2. 通常の学習画面（テスト以外） ---
-
-      // ヘッダー
+      // --- 通常画面 ---
       var header = document.createElement('div');
       header.className = "card header";
       header.innerHTML = '<strong>ロシア語 日課学習</strong>';
@@ -661,165 +728,183 @@
       header.appendChild(lockBtn);
       app.appendChild(header);
 
-      // 学習日操作バー
       var bar = document.createElement('div');
       bar.className = "bar";
-      bar.innerHTML = '<div>学習日: <strong>' + recDate + '</strong> <span style="font-size:10px;opacity:0.8;">(' + dayInfo.totalDays + '日目)</span></div>';
+      bar.innerHTML = '<div>学習日: <strong>' + recDate + ' (' + currentWeekName + ')</strong> <span style="font-size:10px;opacity:0.8;">[平日' + dayInfo.totalDays + '日目]</span></div>';
       var nextBtn = document.createElement('button');
       nextBtn.textContent = "手動で翌日へ";
       nextBtn.onclick = function() {
-        state.manualOffset += 1;
-        localStorage.setItem('ru_app_manual_offset', state.manualOffset.toString());
+        // 単純に1日ずつ日付だけを進める（二重加算を防止）
         state.selectedRecordDate = addDaysToStr(state.selectedRecordDate, 1);
         render();
       };
       bar.appendChild(nextBtn);
       app.appendChild(bar);
 
-      // --- 【文法覚えるエリア】 ---
-      var gCard = document.createElement('div');
-      gCard.className = "card";
-      
-      var gTitleRow = document.createElement('div');
-      gTitleRow.className = "section-title";
-      gTitleRow.innerHTML = '<span>📖 本日の文法（5問）</span>';
-      gCard.appendChild(gTitleRow);
-
-      var gSet = [];
-      for (var i = 0; i < 5; i++) {
-        gSet.push(SENTENCES_POOL[(setIdx * 5 + i) % SENTENCES_POOL.length]);
-      }
-
-      for (var k = 0; k < 5; k++) {
-        (function(idx) {
-          var item = gSet[idx];
-          var box = document.createElement('div');
-          box.className = "word-row";
-          box.style.flexDirection = "column";
-          box.style.alignItems = "flex-start";
-
-          var ruLabel = document.createElement('div');
-          ruLabel.style.fontSize = "15px";
-          ruLabel.style.fontWeight = "bold";
-          ruLabel.textContent = (idx + 1) + ". " + item.ru;
-          box.appendChild(ruLabel);
-
-          var showBtn = document.createElement('button');
-          showBtn.className = "btn btn-sub";
-          showBtn.style.marginTop = "6px";
-          showBtn.style.padding = "4px 8px";
-          showBtn.style.fontSize = "11px";
-          showBtn.textContent = "和訳を確認";
-
-          var jpLabel = document.createElement('div');
-          jpLabel.style.fontSize = "13px";
-          jpLabel.style.color = "#4f46e5";
-          jpLabel.style.marginTop = "6px";
-          jpLabel.style.display = "none";
-          jpLabel.textContent = "→ " + item.jp;
-
-          showBtn.onclick = function() {
-            jpLabel.style.display = (jpLabel.style.display === "none") ? "block" : "none";
-          };
-
-          box.appendChild(showBtn);
-          box.appendChild(jpLabel);
-          gCard.appendChild(box);
-        })(k);
-      }
-
-      // 文法テストボタン
-      var gTestBtn = document.createElement('button');
-      gTestBtn.className = "btn btn-test";
-      gTestBtn.textContent = "📝 文法テストを開始する";
-      gTestBtn.onclick = function() {
-        state.activeTest = 'grammar';
-        state.testIdx = 0; state.testFailCount = 0; state.testInput = ''; state.testFeedback = ''; state.testShowAnswer = false;
-        render();
-      };
-      gCard.appendChild(gTestBtn);
-      app.appendChild(gCard);
-
-      // --- 【単語覚えるエリア】 ---
-      var vCard = document.createElement('div');
-      vCard.className = "card";
-
-      var vTitleRow = document.createElement('div');
-      vTitleRow.className = "section-title";
-      vTitleRow.innerHTML = '<span>🔤 本日の単語（5語 / ' + (dayInCycle === 1 ? '1日目' : '2日目') + '）</span>';
-      vCard.appendChild(vTitleRow);
-
-      var vSet = [];
-      for (var i = 0; i < 5; i++) {
-        vSet.push(WORDS_POOL[(setIdx * 5 + i) % WORDS_POOL.length]);
-      }
-
-      if (dayInCycle === 1) {
-        // 1日目：ロシア語・読み・意味
-        for (var k = 0; k < 5; k++) {
-          var w = vSet[k];
-          var row = document.createElement('div');
-          row.className = "word-row";
-          row.innerHTML = '<div><strong>' + w.ru + '</strong><div style="font-size:10px;color:#4f46e5;">' + w.reading + '</div></div><div>' + w.jp + '</div>';
-          vCard.appendChild(row);
-        }
+      // --- 土日お休み表示 ---
+      if (dayInfo.isWeekend) {
+        var weekendCard = document.createElement('div');
+        weekendCard.className = "card";
+        weekendCard.style.textAlign = "center";
+        weekendCard.style.padding = "30px 16px";
+        weekendCard.innerHTML = '<h3 style="color:#64748b;margin-bottom:8px;">☕ 本日はお休み（' + currentWeekName + '曜日）です</h3><p style="font-size:12px;color:#94a3b8;">ゆっくり休みましょう。月曜日からまた再開します！</p>';
+        app.appendChild(weekendCard);
       } else {
-        // 2日目：日本語からロシア語タイピング練習
+        // --- 文法エリア ---
+        var gCard = document.createElement('div');
+        gCard.className = "card";
+        
+        var gTitleRow = document.createElement('div');
+        gTitleRow.className = "section-title";
+        gTitleRow.innerHTML = '<span>📖 本日の文法（5問）</span>';
+        gCard.appendChild(gTitleRow);
+
+        var gSet = [];
+        for (var i = 0; i < 5; i++) {
+          gSet.push(SENTENCES_POOL[(setIdx * 5 + i) % SENTENCES_POOL.length]);
+        }
+
         for (var k = 0; k < 5; k++) {
           (function(idx) {
-            var w = vSet[idx];
+            var item = gSet[idx];
             var box = document.createElement('div');
             box.className = "word-row";
             box.style.flexDirection = "column";
             box.style.alignItems = "flex-start";
-            box.innerHTML = '<div style="font-size:14px;font-weight:bold;">' + w.jp + ' <span style="font-size:11px;color:#64748b;">(' + w.reading + ')</span></div>';
 
-            var practiceIn = document.createElement('input');
-            practiceIn.type = "text";
-            practiceIn.placeholder = "ロシア語を練習用に入力...";
-            practiceIn.style.margin = "6px 0 0 0";
-            practiceIn.style.padding = "6px";
-            practiceIn.style.fontSize = "12px";
+            var ruLabel = document.createElement('div');
+            ruLabel.style.fontSize = "15px";
+            ruLabel.style.fontWeight = "bold";
+            ruLabel.textContent = (idx + 1) + ". " + item.ru;
+            box.appendChild(ruLabel);
 
-            var checkBtn = document.createElement('button');
-            checkBtn.className = "btn btn-sub";
-            checkBtn.style.marginTop = "4px";
-            checkBtn.style.padding = "4px 8px";
-            checkBtn.style.fontSize = "10px";
-            checkBtn.textContent = "正解を表示";
+            var showBtn = document.createElement('button');
+            showBtn.className = "btn btn-sub";
+            showBtn.style.marginTop = "6px";
+            showBtn.style.padding = "4px 8px";
+            showBtn.style.fontSize = "11px";
+            showBtn.textContent = "和訳を確認";
 
-            var ansSp = document.createElement('span');
-            ansSp.style.color = "#4f46e5";
-            ansSp.style.fontWeight = "bold";
-            ansSp.style.display = "none";
-            ansSp.style.marginTop = "4px";
-            ansSp.textContent = " → " + w.ru;
+            var jpLabel = document.createElement('div');
+            jpLabel.style.fontSize = "13px";
+            jpLabel.style.color = "#4f46e5";
+            jpLabel.style.marginTop = "6px";
+            jpLabel.style.display = "none";
+            jpLabel.textContent = "→ " + item.jp;
 
-            checkBtn.onclick = function() {
-              ansSp.style.display = (ansSp.style.display === "none") ? "inline" : "none";
+            showBtn.onclick = function() {
+              jpLabel.style.display = (jpLabel.style.display === "none") ? "block" : "none";
             };
 
-            box.appendChild(practiceIn);
-            box.appendChild(checkBtn);
-            box.appendChild(ansSp);
-            vCard.appendChild(box);
+            box.appendChild(showBtn);
+            box.appendChild(jpLabel);
+            gCard.appendChild(box);
           })(k);
         }
+
+        var gTestBtn = document.createElement('button');
+        gTestBtn.className = "btn btn-test";
+        gTestBtn.textContent = "📝 文法テストを開始する";
+        gTestBtn.onclick = function() {
+          state.activeTest = 'grammar';
+          state.testIdx = 0; state.testFailCount = 0; state.testInput = ''; state.testFeedback = ''; state.testShowAnswer = false;
+          render();
+        };
+        gCard.appendChild(gTestBtn);
+        app.appendChild(gCard);
+
+        // --- 単語エリア ---
+        var vCard = document.createElement('div');
+        vCard.className = "card";
+
+        var vTitleRow = document.createElement('div');
+        vTitleRow.className = "section-title";
+        
+        var vSet = [];
+        if (dayInfo.isFriday) {
+          vTitleRow.innerHTML = '<span>🔤 金曜まとめ：苦手な単語5選</span>';
+          vSet = getTopWeakWords(setIdx);
+        } else {
+          vTitleRow.innerHTML = '<span>🔤 本日の単語（5語 / ' + (dayInCycle === 1 ? '1日目：インプット' : '2日目：練習') + '）</span>';
+          for (var i = 0; i < 5; i++) {
+            vSet.push(WORDS_POOL[(setIdx * 5 + i) % WORDS_POOL.length]);
+          }
+        }
+        vCard.appendChild(vTitleRow);
+
+        if (dayInfo.isFriday) {
+          for (var k = 0; k < vSet.length; k++) {
+            var w = vSet[k];
+            var fails = state.failCounts[w.ru] || 0;
+            var row = document.createElement('div');
+            row.className = "word-row";
+            row.innerHTML = '<div><strong>' + w.ru + '</strong><div style="font-size:10px;color:#ef4444;">ミス: ' + fails + '回 (' + w.reading + ')</div></div><div>' + w.jp + '</div>';
+            vCard.appendChild(row);
+          }
+        } else if (dayInCycle === 1) {
+          for (var k = 0; k < 5; k++) {
+            var w = vSet[k];
+            var row = document.createElement('div');
+            row.className = "word-row";
+            row.innerHTML = '<div><strong>' + w.ru + '</strong><div style="font-size:10px;color:#4f46e5;">' + w.reading + '</div></div><div>' + w.jp + '</div>';
+            vCard.appendChild(row);
+          }
+        } else {
+          for (var k = 0; k < 5; k++) {
+            (function(idx) {
+              var w = vSet[idx];
+              var box = document.createElement('div');
+              box.className = "word-row";
+              box.style.flexDirection = "column";
+              box.style.alignItems = "flex-start";
+              box.innerHTML = '<div style="font-size:14px;font-weight:bold;">' + w.jp + ' <span style="font-size:11px;color:#64748b;">(' + w.reading + ')</span></div>';
+
+              var practiceIn = document.createElement('input');
+              practiceIn.type = "text";
+              practiceIn.placeholder = "ロシア語を練習用に入力...";
+              practiceIn.style.margin = "6px 0 0 0";
+              practiceIn.style.padding = "6px";
+              practiceIn.style.fontSize = "12px";
+
+              var checkBtn = document.createElement('button');
+              checkBtn.className = "btn btn-sub";
+              checkBtn.style.marginTop = "4px";
+              checkBtn.style.padding = "4px 8px";
+              checkBtn.style.fontSize = "10px";
+              checkBtn.textContent = "正解を表示";
+
+              var ansSp = document.createElement('span');
+              ansSp.style.color = "#4f46e5";
+              ansSp.style.fontWeight = "bold";
+              ansSp.style.display = "none";
+              ansSp.style.marginTop = "4px";
+              ansSp.textContent = " → " + w.ru;
+
+              checkBtn.onclick = function() {
+                ansSp.style.display = (ansSp.style.display === "none") ? "inline" : "none";
+              };
+
+              box.appendChild(practiceIn);
+              box.appendChild(checkBtn);
+              box.appendChild(ansSp);
+              vCard.appendChild(box);
+            })(k);
+          }
+        }
+
+        var vTestBtn = document.createElement('button');
+        vTestBtn.className = "btn btn-test";
+        vTestBtn.textContent = "📝 単語テストを開始する";
+        vTestBtn.onclick = function() {
+          state.activeTest = 'vocab';
+          state.testIdx = 0; state.testFailCount = 0; state.testInput = ''; state.testFeedback = ''; state.testShowAnswer = false;
+          render();
+        };
+        vCard.appendChild(vTestBtn);
+        app.appendChild(vCard);
       }
 
-      // 単語テストボタン
-      var vTestBtn = document.createElement('button');
-      vTestBtn.className = "btn btn-test";
-      vTestBtn.textContent = "📝 単語テストを開始する";
-      vTestBtn.onclick = function() {
-        state.activeTest = 'vocab';
-        state.testIdx = 0; state.testFailCount = 0; state.testInput = ''; state.testFeedback = ''; state.testShowAnswer = false;
-        render();
-      };
-      vCard.appendChild(vTestBtn);
-      app.appendChild(vCard);
-
-      // --- 【復習リスト】 ---
+      // --- 復習リスト ---
       if (state.reviewPool.length > 0) {
         var rCard = document.createElement('div');
         rCard.className = "card";
@@ -852,7 +937,7 @@
         app.appendChild(rCard);
       }
 
-      // --- 実施記録＆月間カレンダー ---
+      // --- カレンダー ---
       var recCard = document.createElement('div');
       recCard.className = "card";
 
@@ -893,7 +978,7 @@
       titleSpan.style.fontSize = "12px";
       titleSpan.style.fontWeight = "bold";
       titleSpan.style.color = "#64748b";
-      titleSpan.textContent = year + "年 " + month + "月（タップで過去日の学習へ）";
+      titleSpan.textContent = year + "年 " + month + "月";
       calTitleRow.appendChild(titleSpan);
 
       if (recDate !== todayStr) {
@@ -937,8 +1022,12 @@
           var selected = (dStr === recDate);
           var isToday = (dStr === todayStr);
 
+          var checkDate = new Date(year, month - 1, dayNum);
+          var dow = checkDate.getDay();
+          var isWeekendDay = (dow === 0 || dow === 6);
+
           var dayBtn = document.createElement('div');
-          dayBtn.className = "day-box " + (done ? 'done ' : '') + (selected ? 'selected' : '');
+          dayBtn.className = "day-box " + (done ? 'done ' : '') + (selected ? 'selected ' : '') + (isWeekendDay ? 'weekend' : '');
           dayBtn.onclick = function() {
             state.selectedRecordDate = dStr;
             render();
