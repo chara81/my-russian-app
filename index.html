@@ -3,18 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ロシア語日課学習</title>
+  <title>学習ポータル（ロシア語 / 数学）</title>
+  <!-- 数式を綺麗に描画するMathJax -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; color: #1e293b; padding: 16px; }
-    .container { max-width: 500px; margin: 0 auto; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; color: #1e293b; padding: 16px; min-height: 100vh; }
+    body.math-theme { background-color: #0f172a; color: #f8fafc; }
+    .container { max-width: 520px; margin: 0 auto; }
     .card { background: #ffffff; padding: 16px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .btn { background: #4f46e5; color: white; border: none; padding: 10px 16px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; width: 100%; text-align: center; display: block; }
     .btn-sub { background: #f1f5f9; color: #475569; }
     .btn-test { background: #059669; color: white; margin-top: 8px; }
-    .btn-danger { background: #ef4444; color: white; }
     .btn-success { background: #10b981; color: white; }
-    .header { display: flex; justify-content: space-between; align-items: center; }
+    .header { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
     .bar { background: #1e1b4b; color: white; padding: 12px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 12px; }
     .bar button { background: #3730a3; color: white; border: 1px solid #4338ca; padding: 6px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; }
     .word-row { padding: 10px; background: #f8fafc; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
@@ -30,6 +37,28 @@
     .badge-friday { background: #fef3c7; color: #92400e; }
     .error-text { color: #ef4444; font-size: 13px; margin-top: 8px; text-align: center; font-weight: bold; }
     .section-title { font-size: 15px; font-weight: bold; margin-bottom: 10px; color: #1e1b4b; display: flex; justify-content: space-between; align-items: center; }
+
+    /* 科目選択カード */
+    .select-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 16px; }
+    .select-card { padding: 20px; border-radius: 16px; border: 2px solid #e2e8f0; background: #ffffff; cursor: pointer; text-align: left; transition: transform 0.1s, border-color 0.2s; }
+    .select-card:hover { border-color: #4f46e5; transform: translateY(-2px); }
+    .select-card.math-choice { background: #1e293b; color: #f8fafc; border-color: #334155; }
+    .select-card.math-choice:hover { border-color: #38bdf8; }
+
+    /* 数学専用スタイル */
+    .math-card { background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 24px 18px; margin-bottom: 14px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
+    .math-tag { display: inline-block; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 999px; background: #334155; color: #38bdf8; margin-bottom: 14px; }
+    .prompt-box { min-height: 130px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-size: 21px; line-height: 1.6; margin: 10px 0 20px 0; overflow-x: auto; }
+    .sub-note { font-size: 13px; color: #94a3b8; margin-top: 10px; }
+    .btn-math-main { background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; border: none; padding: 14px 20px; border-radius: 14px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4); }
+    .math-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .btn-math-sub { background: #334155; color: #cbd5e1; border: none; padding: 10px; border-radius: 10px; font-size: 13px; font-weight: bold; cursor: pointer; }
+    .reveal-box { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 14px; margin-top: 12px; font-size: 14px; line-height: 1.7; color: #e2e8f0; }
+    .reveal-title { font-size: 11px; font-weight: bold; color: #38bdf8; margin-bottom: 6px; text-transform: uppercase; }
+    .math-textarea { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 12px; color: #f8fafc; padding: 12px; font-size: 14px; min-height: 85px; resize: vertical; margin-top: 8px; font-family: inherit; }
+    .fav-btn { background: none; border: 1px solid #475569; color: #94a3b8; padding: 4px 10px; border-radius: 8px; font-size: 12px; cursor: pointer; }
+    .fav-btn.active { border-color: #f59e0b; color: #fbbf24; background: rgba(245, 158, 11, 0.1); }
+    .stock-item { background: #0f172a; padding: 10px 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; cursor: pointer; border: 1px solid #1e293b; color: #e2e8f0; }
   </style>
 </head>
 <body>
@@ -37,9 +66,9 @@
 
   <script>
     var SECRET_PASSWORD = "5028";
-    // 2026-10-12（月曜日）を開始基準日に設定（月・火＝セット1、水・木＝セット2、金＝まとめ）
     var BASE_DATE_STR = "2026-10-12";
 
+    // --- ロシア語データ ---
     var SENTENCES_POOL = [
       { ru: "Я читаю книгу.", jp: "私は本を読んでいます。" },
       { ru: "Он пишет письма.", jp: "彼は手紙を書いています。" },
@@ -345,6 +374,106 @@
       { ru: "мечта", reading: "メチター", jp: "夢" }
     ];
 
+    // --- 数学データ ---
+    var MATH_PROBLEMS = [
+      {
+        id: "zeta2",
+        category: "解析学 / バーゼル問題",
+        tex: "$$ \\zeta(2) = \\sum_{n=1}^{\\infty} \\frac{1}{n^2} $$",
+        note: "この級数の収束値を求めよ",
+        hint: "オイラーの方法では $\\sin x$ のテイラー展開と無限積表示の $x^2$ の係数を比較します。フーリエ級数展開を使う手もあります。",
+        ans: "$$ \\frac{\\pi^2}{6} $$ $\\frac{\\sin x}{x} = 1 - \\frac{x^2}{3!} + \\frac{x^4}{5!} - \\cdots = \\prod_{n=1}^{\\infty} \\left(1 - \\frac{x^2}{n^2\\pi^2}\\right)$ の $x^2$ の係数を比較すると導けます。"
+      },
+      {
+        id: "gaussian",
+        category: "解析学 / ガウス積分",
+        tex: "$$ \\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx $$",
+        note: "この広義積分の値を求めよ",
+        hint: "1変数のままでは原始関数が初等関数で表せません。積分値を $I$ とおいて、$I^2$ を2重積分にして極座標変換してみましょう。",
+        ans: "$$ \\sqrt{\\pi} $$ $I^2 = \\iint_{\\mathbb{R}^2} e^{-(x^2+y^2)} dx dy = \\int_0^{2\\pi} d\\theta \\int_0^{\\infty} e^{-r^2} r \\, dr = 2\\pi \\cdot \\frac{1}{2} = \\pi$ より $I = \\sqrt{\\pi}$。"
+      },
+      {
+        id: "ii",
+        category: "複素解析",
+        tex: "$$ i^i $$",
+        note: "虚数単位の虚数単位乗はどんな数になるか？",
+        hint: "オイラーの公式 $e^{i\\theta} = \\cos\\theta + i\\sin\\theta$ を使って、まず $i$ を指数形式 $e^{i(\\frac{\\pi}{2} + 2n\\pi)}$ で表してみましょう。",
+        ans: "$$ e^{-\\frac{\\pi}{2} - 2n\\pi} \\quad (n \\in \\mathbb{Z}) $$ なんと**実数**になります（主値は $e^{-\\pi/2} \\approx 0.207879...$）。"
+      },
+      {
+        id: "prime_inf",
+        category: "整数論",
+        tex: "$$ p_1, p_2, \\dots, p_n \\text{ がすべての素数であるとする} $$",
+        note: "素数が無限に存在することを示せ（ユークリッド以外の証明も考えてみよう）",
+        hint: "定番は $N = p_1 p_2 \\cdots p_n + 1$ を考える方法。フェルマー数 $F_n = 2^{2^n} + 1$ が互いに素であることを使う証明もあります。",
+        ans: "$N = p_1 p_2 \\cdots p_n + 1$ はどの $p_k$ で割っても1余るため、$N$ 自身が新しい素数か、リストにない新しい素因数を持つことになり矛盾します。"
+      },
+      {
+        id: "e_pi",
+        category: "実数・不等式",
+        tex: "$$ e^{\\pi} \\quad \\text{と} \\quad \\pi^{e} $$",
+        note: "どちらが大きいか？（電卓なしで示せ）",
+        hint: "両辺の自然対数をとって比較するか、関数 $f(x) = \\frac{\\ln x}{x}$ の増減を微分で調べてみましょう。",
+        ans: "$$ e^{\\pi} > \\pi^{e} $$ $f(x) = \\frac{\\ln x}{x}$ は $x = e$ で最大値をとるため、$x = \\pi > e$ においては $\\frac{\\ln \\pi}{\\pi} < \\frac{\\ln e}{e} = \\frac{1}{e}$。両辺に $e\\pi$ を掛けると $e \\ln \\pi < \\pi$ となります。"
+      },
+      {
+        id: "harmonics",
+        category: "級数 / 調和級数",
+        tex: "$$ \\sum_{n=1}^{\\infty} \\frac{1}{n} = 1 + \\frac{1}{2} + \\frac{1}{3} + \\frac{1}{4} + \\cdots $$",
+        note: "なぜ一般項が0に近づくのに発散するのか示せ",
+        hint: "分母を2のべき乗で区切って、それぞれのグループが $\\frac{1}{2}$ より大きくなるように下から評価してみましょう（オレシームの証明）。",
+        ans: "$1 + \\frac{1}{2} + (\\frac{1}{3}+\\frac{1}{4}) + (\\frac{1}{5}+\\dots+\\frac{1}{8}) + \\dots > 1 + \\frac{1}{2} + \\frac{1}{2} + \\frac{1}{2} + \\dots \\to \\infty$ となるため発散します。"
+      },
+      {
+        id: "stirling",
+        category: "極限・近似",
+        tex: "$$ \\lim_{n \\to \\infty} \\frac{n!}{\\sqrt{2\\pi n} \\left(\\frac{n}{e}\\right)^n} $$",
+        note: "スターリングの近似式の意味と導出のアイデアを考えよ",
+        hint: "$\\ln(n!) = \\sum_{k=1}^n \\ln k$ を積分 $\\int_1^n \\ln x \\, dx$ で近似すると、大まかな形 $n \\ln n - n$ が見えてきます。",
+        ans: "極限値は **$1$** です。階乗の増加スピードを指数関数とべき乗で精密に捉える公式で、統計力学や確率論で不可欠です。"
+      },
+      {
+        id: "det_eigen",
+        category: "線形代数",
+        tex: "$$ \\det(A - \\lambda I) = 0 $$",
+        note: "固有値 $\\lambda$ の総和と総積は、元の行列 $A$ の何に等しいか？",
+        hint: "2×2行列 $A = \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$ で固有多項式 $\\lambda^2 - (a+d)\\lambda + (ad-bc) = 0$ を展開して解と係数の関係を見てみましょう。",
+        ans: "固有値の**総和はトレース $\\operatorname{tr}(A)$**（対角成分の和）に、**総積は行列式 $\\det(A)$** に等しくなります。"
+      },
+      {
+        id: "monty",
+        category: "確率・直感",
+        tex: "$$ P(\\text{ドアを変更して当たり}) = ? $$",
+        note: "モンティ・ホール問題：なぜドアを変えると確率が2倍になるのか、100枚のドアで想像してみよ",
+        hint: "ドアが100枚あり、あなたが1枚選んだあと、司会者がハズレの98枚を開けて残り1枚にした状況をイメージしてください。",
+        ans: "変更すると確率は **$\\frac{2}{3}$** になります。最初にハズレを引く確率が $\\frac{2}{3}$ であり、その場合司会者が残したドアが必ず当たりになるためです。"
+      },
+      {
+        id: "euler_poly",
+        category: "トポロジー・幾何",
+        tex: "$$ V - E + F = 2 $$",
+        note: "凸多面体で「頂点 - 辺 + 面」が常に2になる理由を説明せよ",
+        hint: "多面体の1つの面を取り除いて平面にペチャンコに広げ（平面グラフ）、三角形に分割してから辺や頂点を1つずつ削っていくと不変量が見えます。",
+        ans: "平面グラフ上で辺や頂点を1つずつ消しても $V - E + F$ の値は変化せず、最後に頂点1つ（$1 - 0 + 0 = 1$）が残るため、元の面を足すと $2$ になります。"
+      },
+      {
+        id: "sqrt2_irr",
+        category: "代数学 / 整数",
+        tex: "$$ \\sqrt{2} \\notin \\mathbb{Q} $$",
+        note: "背理法（偶奇性）を使わずに、素因数分解の一意性から $\\sqrt{2}$ の無理数性を示せ",
+        hint: "$a^2 = 2b^2$ の両辺を素因数分解したとき、素因数 $2$ の個数（指数）の偶奇に注目してみましょう。",
+        ans: "$a^2$ の素因数 $2$ の個数は**偶数個**ですが、$2b^2$ の素因数 $2$ の個数は**奇数個**になります。素因数分解の一意性に矛盾するため、整数解は存在しません。"
+      },
+      {
+        id: "leibniz",
+        category: "解析学 / ライプニッツ級数",
+        tex: "$$ 1 - \\frac{1}{3} + \\frac{1}{5} - \\frac{1}{7} + \\frac{1}{9} - \\cdots $$",
+        note: "この交代級数の値と、その導出方法を考えよ",
+        hint: "等比級数の和 $\\frac{1}{1+t^2} = 1 - t^2 + t^4 - t^6 + \\cdots$ を $0$ から $1$ まで積分してみましょう。",
+        ans: "$$ \\frac{\\pi}{4} $$ $\\arctan(1) = \\int_0^1 \\frac{1}{1+t^2} dt = \\left[ t - \\frac{t^3}{3} + \\frac{t^5}{5} - \\cdots \\right]_0^1$ から導かれます。"
+      }
+    ];
+
     function getTodayStr() {
       var now = new Date();
       var y = now.getFullYear();
@@ -370,12 +499,11 @@
       } catch (e) { return null; }
     }
 
-    // 古いオフセットデータをリセットしてズレを防止
-    localStorage.removeItem('ru_app_manual_offset');
-
     var state = {
       isAuthenticated: false,
       authError: false,
+      subject: null, // null（選択画面） | 'russian' | 'math'
+      // ロシア語用ステート
       activeTest: null,
       selectedRecordDate: getTodayStr(),
       historyLogs: safeParse('ru_app_history_logs') || {},
@@ -385,7 +513,13 @@
       testFailCount: 0,
       testInput: '',
       testFeedback: '',
-      testShowAnswer: false
+      testShowAnswer: false,
+      // 数学用ステート
+      mathIdx: 0,
+      mathShowHint: false,
+      mathShowAns: false,
+      mathFavs: safeParse('math_favs') || [],
+      mathMemos: safeParse('math_memos') || {}
     };
 
     function saveFailCounts() {
@@ -397,18 +531,16 @@
       saveFailCounts();
     }
 
-    // 土日・金曜を除いた「通常学習日（月・火・水・木）」のみをカウントして1日目・2日目を厳密に算出
     function getDayInfo(dateStr) {
       var b = BASE_DATE_STR.split('-');
       var t = dateStr.split('-');
       var baseDate = new Date(parseInt(b[0],10), parseInt(b[1],10) - 1, parseInt(b[2],10));
       var targetDate = new Date(parseInt(t[0],10), parseInt(t[1],10) - 1, parseInt(t[2],10));
 
-      var dayOfWeek = targetDate.getDay(); // 0:日, 1:月, 2:火, 3:水, 4:木, 5:金, 6:土
+      var dayOfWeek = targetDate.getDay();
       var isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
       var isFriday = (dayOfWeek === 5);
 
-      // 基準日（月曜）から対象日までの間にある「月・火・水・木」の回数を数える
       var regularStudyDays = 0;
       var totalWeekdays = 0;
 
@@ -418,7 +550,7 @@
           var dow = cur.getDay();
           if (dow !== 0 && dow !== 6) {
             totalWeekdays++;
-            if (dow !== 5) { // 金曜以外の平日（月〜木）
+            if (dow !== 5) {
               regularStudyDays++;
             }
           }
@@ -426,7 +558,6 @@
         }
       }
 
-      // 月・水は1日目、火・木は2日目に必ず一致する
       var cycleIdx = Math.floor(regularStudyDays / 2);
       var dayInCycle = (regularStudyDays % 2) + 1;
 
@@ -475,6 +606,7 @@
       if (inputEl && inputEl.value === SECRET_PASSWORD) {
         state.isAuthenticated = true;
         state.authError = false;
+        state.subject = null; // ログイン直後は科目選択画面へ
       } else {
         state.authError = true;
       }
@@ -486,12 +618,22 @@
       if (!app) return;
       app.innerHTML = '';
 
+      // テーマ切り替え
+      if (state.isAuthenticated && state.subject === 'math') {
+        document.body.className = 'math-theme';
+      } else {
+        document.body.className = '';
+      }
+
+      // ==========================================
+      // 1. ログイン画面
+      // ==========================================
       if (!state.isAuthenticated) {
         var loginCard = document.createElement('div');
         loginCard.className = "card";
         loginCard.style.textAlign = "center";
         loginCard.style.marginTop = "40px";
-        loginCard.innerHTML = '<h2 style="margin-bottom:8px;">ロシア語日課学習</h2><p style="font-size:12px;color:#64748b;margin-bottom:16px;">パスワードを入力してください</p>';
+        loginCard.innerHTML = '<h2 style="margin-bottom:8px;">学習ポータル</h2><p style="font-size:12px;color:#64748b;margin-bottom:16px;">パスワードを入力してください</p>';
 
         var form = document.createElement('form');
         form.onsubmit = handleLoginSubmit;
@@ -524,6 +666,234 @@
         return;
       }
 
+      // ==========================================
+      // 2. 科目選択画面（ロシア語 or 数学）
+      // ==========================================
+      if (state.subject === null) {
+        var selCard = document.createElement('div');
+        selCard.className = "card";
+        selCard.style.marginTop = "32px";
+        selCard.style.padding = "24px 18px";
+
+        var topHead = document.createElement('div');
+        topHead.style.display = "flex";
+        topHead.style.justifyContent = "space-between";
+        topHead.style.alignItems = "center";
+        topHead.style.marginBottom = "16px";
+        topHead.innerHTML = '<div><h2 style="font-size:18px;">どちらを学習しますか？</h2><p style="font-size:12px;color:#64748b;margin-top:2px;">モードを選択してください</p></div>';
+
+        var lockBtn = document.createElement('button');
+        lockBtn.className = "btn btn-sub";
+        lockBtn.style.width = "auto";
+        lockBtn.style.padding = "6px 10px";
+        lockBtn.style.fontSize = "12px";
+        lockBtn.textContent = "ロック";
+        lockBtn.onclick = function() { state.isAuthenticated = false; render(); };
+        topHead.appendChild(lockBtn);
+        selCard.appendChild(topHead);
+
+        var grid = document.createElement('div');
+        grid.className = "select-grid";
+
+        // ロシア語選択ボタン
+        var ruChoice = document.createElement('button');
+        ruChoice.className = "select-card";
+        ruChoice.innerHTML = '<div style="font-size:16px;font-weight:bold;color:#1e1b4b;margin-bottom:4px;">🇷🇺 ロシア語 日課学習</div><div style="font-size:12px;color:#64748b;">月〜木の2日サイクル学習・金曜まとめテスト・単語/文法</div>';
+        ruChoice.onclick = function() {
+          state.subject = 'russian';
+          state.activeTest = null;
+          render();
+        };
+
+        // 数学選択ボタン
+        var mathChoice = document.createElement('button');
+        mathChoice.className = "select-card math-choice";
+        mathChoice.innerHTML = '<div style="font-size:16px;font-weight:bold;color:#38bdf8;margin-bottom:4px;">∑ 数学の思考トリガー</div><div style="font-size:12px;color:#94a3b8;">1つの数式・問いから自由に思考を広げる（ヒント・解説・メモ帳付き）</div>';
+        mathChoice.onclick = function() {
+          state.subject = 'math';
+          render();
+        };
+
+        grid.appendChild(ruChoice);
+        grid.appendChild(mathChoice);
+        selCard.appendChild(grid);
+        app.appendChild(selCard);
+        return;
+      }
+
+      // ==========================================
+      // 3. 数学モード画面
+      // ==========================================
+      if (state.subject === 'math') {
+        var p = MATH_PROBLEMS[state.mathIdx];
+
+        // ヘッダー
+        var mHeader = document.createElement('div');
+        mHeader.style.display = "flex";
+        mHeader.style.justifyContent = "space-between";
+        mHeader.style.alignItems = "center";
+        mHeader.style.marginBottom = "14px";
+
+        var mTitle = document.createElement('div');
+        mTitle.innerHTML = '<strong style="font-size:14px;color:#94a3b8;">∑ MATH CONTEMPLATION</strong>';
+
+        var mBtnGroup = document.createElement('div');
+        mBtnGroup.style.display = "flex";
+        mBtnGroup.style.gap = "6px";
+
+        var switchBtn = document.createElement('button');
+        switchBtn.className = "fav-btn";
+        switchBtn.textContent = "科目切替";
+        switchBtn.onclick = function() { state.subject = null; render(); };
+
+        var mLockBtn = document.createElement('button');
+        mLockBtn.className = "fav-btn";
+        mLockBtn.textContent = "ロック";
+        mLockBtn.onclick = function() { state.isAuthenticated = false; render(); };
+
+        mBtnGroup.appendChild(switchBtn);
+        mBtnGroup.appendChild(mLockBtn);
+        mHeader.appendChild(mTitle);
+        mHeader.appendChild(mBtnGroup);
+        app.appendChild(mHeader);
+
+        // メイン問題カード
+        var mCard = document.createElement('div');
+        mCard.className = "math-card";
+
+        var topMeta = document.createElement('div');
+        topMeta.style.display = "flex";
+        topMeta.style.justifyContent = "space-between";
+        topMeta.style.alignItems = "center";
+
+        var tag = document.createElement('span');
+        tag.className = "math-tag";
+        tag.style.marginBottom = "0";
+        tag.textContent = p.category;
+
+        var favBtn = document.createElement('button');
+        var isFav = state.mathFavs.indexOf(p.id) !== -1;
+        favBtn.className = "fav-btn " + (isFav ? "active" : "");
+        favBtn.textContent = isFav ? "★ ストック済み" : "☆ ストックする";
+        favBtn.onclick = function() {
+          var idx = state.mathFavs.indexOf(p.id);
+          if (idx === -1) state.mathFavs.push(p.id);
+          else state.mathFavs.splice(idx, 1);
+          localStorage.setItem('math_favs', JSON.stringify(state.mathFavs));
+          render();
+        };
+
+        topMeta.appendChild(tag);
+        topMeta.appendChild(favBtn);
+        mCard.appendChild(topMeta);
+
+        var promptBox = document.createElement('div');
+        promptBox.className = "prompt-box";
+        promptBox.innerHTML = p.tex + '<div class="sub-note">' + p.note + '</div>';
+        mCard.appendChild(promptBox);
+
+        var nextMathBtn = document.createElement('button');
+        nextMathBtn.className = "btn-math-main";
+        nextMathBtn.textContent = "🎲 次の式・問いを出す";
+        nextMathBtn.onclick = function() {
+          var nextIdx;
+          do {
+            nextIdx = Math.floor(Math.random() * MATH_PROBLEMS.length);
+          } while (nextIdx === state.mathIdx && MATH_PROBLEMS.length > 1);
+          state.mathIdx = nextIdx;
+          state.mathShowHint = false;
+          state.mathShowAns = false;
+          render();
+        };
+        mCard.appendChild(nextMathBtn);
+
+        var ctrlRow = document.createElement('div');
+        ctrlRow.className = "math-controls";
+
+        var hintBtn = document.createElement('button');
+        hintBtn.className = "btn-math-sub";
+        hintBtn.textContent = state.mathShowHint ? "💡 ヒントを隠す" : "💡 ヒントを見る";
+        hintBtn.onclick = function() { state.mathShowHint = !state.mathShowHint; render(); };
+
+        var ansBtn = document.createElement('button');
+        ansBtn.className = "btn-math-sub";
+        ansBtn.textContent = state.mathShowAns ? "🔑 解説を隠す" : "🔑 答え・アプローチ";
+        ansBtn.onclick = function() { state.mathShowAns = !state.mathShowAns; render(); };
+
+        ctrlRow.appendChild(hintBtn);
+        ctrlRow.appendChild(ansBtn);
+        mCard.appendChild(ctrlRow);
+
+        if (state.mathShowHint) {
+          var hBox = document.createElement('div');
+          hBox.className = "reveal-box";
+          hBox.innerHTML = '<div class="reveal-title">Hint</div><div>' + p.hint + '</div>';
+          mCard.appendChild(hBox);
+        }
+
+        if (state.mathShowAns) {
+          var aBox = document.createElement('div');
+          aBox.className = "reveal-box";
+          aBox.innerHTML = '<div class="reveal-title">Answer & Approach</div><div>' + p.ans + '</div>';
+          mCard.appendChild(aBox);
+        }
+
+        app.appendChild(mCard);
+
+        // メモ帳カード
+        var memoCard = document.createElement('div');
+        memoCard.className = "math-card";
+        memoCard.style.padding = "16px 18px";
+        memoCard.innerHTML = '<div style="font-size:12px;font-weight:bold;color:#94a3b8;">✍️ 思考メモ（自動保存）</div>';
+
+        var textarea = document.createElement('textarea');
+        textarea.className = "math-textarea";
+        textarea.placeholder = "気づいたこと、試した変形、方針などを自由に書き留める...";
+        textarea.value = state.mathMemos[p.id] || '';
+        textarea.oninput = function(e) {
+          state.mathMemos[p.id] = e.target.value;
+          localStorage.setItem('math_memos', JSON.stringify(state.mathMemos));
+        };
+        memoCard.appendChild(textarea);
+        app.appendChild(memoCard);
+
+        // ストック一覧
+        if (state.mathFavs.length > 0) {
+          var stockCard = document.createElement('div');
+          stockCard.className = "math-card";
+          stockCard.style.padding = "16px 18px";
+          stockCard.innerHTML = '<div style="font-size:12px;font-weight:bold;color:#fbbf24;margin-bottom:10px;">★ ストックした問い（タップで再表示）</div>';
+
+          state.mathFavs.forEach(function(favId) {
+            var foundIdx = MATH_PROBLEMS.findIndex(function(item) { return item.id === favId; });
+            if (foundIdx !== -1) {
+              var item = MATH_PROBLEMS[foundIdx];
+              var sRow = document.createElement('div');
+              sRow.className = "stock-item";
+              sRow.innerHTML = '<span>' + item.category + ' — ' + item.note + '</span><span style="color:#38bdf8;">開く →</span>';
+              sRow.onclick = function() {
+                state.mathIdx = foundIdx;
+                state.mathShowHint = false;
+                state.mathShowAns = false;
+                render();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              };
+              stockCard.appendChild(sRow);
+            }
+          });
+          app.appendChild(stockCard);
+        }
+
+        // MathJax再描画
+        if (window.MathJax && window.MathJax.typesetPromise) {
+          MathJax.typesetPromise();
+        }
+        return;
+      }
+
+      // ==========================================
+      // 4. ロシア語モード画面（既存仕様を完全維持）
+      // ==========================================
       var recDate = state.selectedRecordDate;
       var todayStr = getTodayStr();
       var dayInfo = getDayInfo(recDate);
@@ -534,7 +904,7 @@
       var weekNames = ['日', '月', '火', '水', '木', '金', '土'];
       var currentWeekName = weekNames[dayInfo.dayOfWeek];
 
-      // --- テスト専用画面 ---
+      // --- ロシア語：テスト専用画面 ---
       if (state.activeTest !== null) {
         var testCard = document.createElement('div');
         testCard.className = "card";
@@ -714,10 +1084,23 @@
         return;
       }
 
-      // --- 通常画面 ---
+      // --- ロシア語：通常画面 ---
       var header = document.createElement('div');
       header.className = "card header";
-      header.innerHTML = '<strong>ロシア語 日課学習</strong>';
+      header.innerHTML = '<strong>🇷🇺 ロシア語 日課学習</strong>';
+
+      var btnGroup = document.createElement('div');
+      btnGroup.style.display = "flex";
+      btnGroup.style.gap = "6px";
+
+      var switchSubBtn = document.createElement('button');
+      switchSubBtn.className = "btn btn-sub";
+      switchSubBtn.style.width = "auto";
+      switchSubBtn.style.padding = "4px 8px";
+      switchSubBtn.style.fontSize = "12px";
+      switchSubBtn.textContent = "科目切替";
+      switchSubBtn.onclick = function() { state.subject = null; render(); };
+
       var lockBtn = document.createElement('button');
       lockBtn.className = "btn btn-sub";
       lockBtn.style.width = "auto";
@@ -725,7 +1108,10 @@
       lockBtn.style.fontSize = "12px";
       lockBtn.textContent = "ロック";
       lockBtn.onclick = function() { state.isAuthenticated = false; render(); };
-      header.appendChild(lockBtn);
+
+      btnGroup.appendChild(switchSubBtn);
+      btnGroup.appendChild(lockBtn);
+      header.appendChild(btnGroup);
       app.appendChild(header);
 
       var bar = document.createElement('div');
@@ -734,14 +1120,12 @@
       var nextBtn = document.createElement('button');
       nextBtn.textContent = "手動で翌日へ";
       nextBtn.onclick = function() {
-        // 単純に1日ずつ日付だけを進める（二重加算を防止）
         state.selectedRecordDate = addDaysToStr(state.selectedRecordDate, 1);
         render();
       };
       bar.appendChild(nextBtn);
       app.appendChild(bar);
 
-      // --- 土日お休み表示 ---
       if (dayInfo.isWeekend) {
         var weekendCard = document.createElement('div');
         weekendCard.className = "card";
@@ -750,7 +1134,7 @@
         weekendCard.innerHTML = '<h3 style="color:#64748b;margin-bottom:8px;">☕ 本日はお休み（' + currentWeekName + '曜日）です</h3><p style="font-size:12px;color:#94a3b8;">ゆっくり休みましょう。月曜日からまた再開します！</p>';
         app.appendChild(weekendCard);
       } else {
-        // --- 文法エリア ---
+        // 文法エリア
         var gCard = document.createElement('div');
         gCard.className = "card";
         
@@ -813,7 +1197,7 @@
         gCard.appendChild(gTestBtn);
         app.appendChild(gCard);
 
-        // --- 単語エリア ---
+        // 単語エリア
         var vCard = document.createElement('div');
         vCard.className = "card";
 
@@ -904,7 +1288,7 @@
         app.appendChild(vCard);
       }
 
-      // --- 復習リスト ---
+      // 復習リスト
       if (state.reviewPool.length > 0) {
         var rCard = document.createElement('div');
         rCard.className = "card";
@@ -937,7 +1321,7 @@
         app.appendChild(rCard);
       }
 
-      // --- カレンダー ---
+      // カレンダー
       var recCard = document.createElement('div');
       recCard.className = "card";
 
